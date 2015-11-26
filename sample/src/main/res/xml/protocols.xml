@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<protocols>
+    <protocol>
+        <name>ul.fcul.lasige.find.sample</name>
+        <encrypted>true</encrypted>
+        <authenticated>true</authenticated>
+        <defaultTTL>3600</defaultTTL>
+    </protocol>
+</protocols>

@@ -1,0 +1,87 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="ul.fcul.lasige.find">
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application
+        android:name="ul.fcul.lasige.find.service.FindApp"
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/AppTheme">
+
+        <!-- ACTIVITIES -->
+        <activity
+            android:name="ul.fcul.lasige.find.ui.MainActivity"
+            android:label="@string/title_activity_main"
+            android:screenOrientation="portrait" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- SERVICES -->
+        <service
+            android:name="ul.fcul.lasige.find.service.ConnectorService"
+            android:exported="true" >
+            <intent-filter>
+                <action android:name="ul.fcul.lasige.find.action.START_FIND" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="ul.fcul.lasige.find.apps.AppRegistrationService"
+            android:exported="true" >
+            <intent-filter>
+                <action android:name="ul.fcul.lasige.find.action.ISSUE_API_KEY" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="ul.fcul.lasige.find.service.SupervisorService"
+            android:exported="false" >
+        </service>
+        <service
+            android:name="ul.fcul.lasige.find.packetcomm.PacketSenderService"
+            android:exported="false" >
+        </service>
+
+        <!-- BROADCAST RECEIVERS -->
+        <receiver
+            android:name="ul.fcul.lasige.find.apps.PackageChangeReceiver"
+            android:enabled="true"
+            android:exported="true" >
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name="ul.fcul.lasige.find.service.SupervisorService$WakeUpReceiver"
+            android:enabled="true"
+            android:exported="true" >
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- CONTENT PROVIDERS -->
+        <provider
+            android:name="ul.fcul.lasige.find.data.FindProvider"
+            android:authorities="ul.fcul.lasige.find.dataprovider"
+            android:enabled="true"
+            android:exported="true" >
+        </provider>
+    </application>
+
+</manifest>

@@ -1,0 +1,17 @@
+<resources>
+
+    <string name="app_name">FIND-Opp</string>
+
+    <!-- Activity labels -->
+    <string name="title_activity_main">Find-Opp</string>
+
+    <!-- Menu labels -->
+    <string name="menu_item_switch">Platform Online</string>
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- Labels in policy list fragment -->
+    <string name="policy_item_active">ACTIVE</string>
+    <string name="button_policy_activate">Activate</string>
+    <string name="button_policy_apply">Apply</string>
+
+</resources>

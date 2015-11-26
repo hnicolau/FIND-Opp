@@ -1,0 +1,26 @@
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusable="false" >
+
+    <TextView
+        android:id="@+id/neighborTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:gravity="center_vertical"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:focusable="false" />
+    
+    <TextView
+        android:id="@+id/neighborDetails"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/neighborTitle"
+        android:layout_below="@+id/neighborTitle"
+        android:lines="2"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:focusable="false" />
+
+</RelativeLayout>
