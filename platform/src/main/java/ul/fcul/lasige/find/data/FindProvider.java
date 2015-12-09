@@ -17,6 +17,7 @@ import android.util.Log;
 
 import ul.fcul.lasige.find.beaconing.BeaconingManager;
 import ul.fcul.lasige.find.data.FullContract.*;
+import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.find.packetcomm.PacketRegistry;
 
 import java.util.Locale;
@@ -289,6 +290,15 @@ public class FindProvider extends ContentProvider {
                 break;
             }
 
+            case PACKET_LIST_OUTGOING: {
+                ClientImplementation implementation = resolveImplementationDetails(uri);
+                table = Packets.VIEW_NAME_OUTGOING;
+                projection = Packets.PROJECTION_DEFAULT;
+                where = String.format(Packets.WHERE_CLAUSE_PROTOCOL, implementation.getProtocolHashAsHex());
+                sortOrder = Packets.SORT_ORDER_DEFAULT_OUTGOING;
+                break;
+            }
+
             case PACKET_LIST: {
                 table = FullContract.Packets.VIEW_NAME_ALL;
                 projection = FullContract.Packets.PROJECTION_DEFAULT;
@@ -308,8 +318,7 @@ public class FindProvider extends ContentProvider {
             queryBuilder.appendWhere(where);
         }
 
-        final Cursor result = queryBuilder.query(
-                db, projection, selection, selectionArgs, null, null, sortOrder);
+        final Cursor result = queryBuilder.query(db, projection, selection, selectionArgs, null, null, sortOrder);
         result.setNotificationUri(getContext().getContentResolver(), uri);
         return result;
     }
