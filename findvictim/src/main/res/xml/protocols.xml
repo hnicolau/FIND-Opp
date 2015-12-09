@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<protocols>
+    <protocol>
+        <name>ul.fcul.lasige.findvictim</name>
+        <encrypted>false</encrypted>
+        <authenticated>false</authenticated>
+        <defaultTTL>3600</defaultTTL>
+    </protocol>
+</protocols>
