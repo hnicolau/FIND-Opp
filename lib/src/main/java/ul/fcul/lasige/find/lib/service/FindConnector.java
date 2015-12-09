@@ -6,6 +6,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,11 +14,14 @@ import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import ul.fcul.lasige.find.lib.data.FindContract;
 import ul.fcul.lasige.find.lib.data.NeighborObserver;
+import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.find.lib.data.PacketObserver;
 import ul.fcul.lasige.find.lib.data.ProtocolDefinitionParser;
 import ul.fcul.lasige.find.lib.data.ProtocolRegistry;
@@ -430,6 +434,48 @@ public class FindConnector implements Handler.Callback {
         else {
             Log.d(TAG, "Packet couldn't be enqueued to FIND platform. Make sure platform is installed");
         }
+    }
+
+    public List<Packet> getOutgoingPackets() {
+        if (mPlatformAvailable) {
+            final String protocolToken = mProtocolRegistry.getSingleToken();
+            return getOutgoingPackets(protocolToken);
+        }
+        else
+        {
+            Log.d(TAG, "Could not retrieve outgoing packets. Make sure platform is installed");
+            return null;
+        }
+    }
+
+    public List<Packet> getOutgoingPackets(String protocolToken) {
+        if (mPlatformAvailable) {
+
+            // get URI for outgoing message
+            Uri packetUri = FindContract.buildProtocolUri(FindContract.Packets.URI_OUTGOING, protocolToken);
+            // get content resolver
+            ContentResolver resolver = mContext.getContentResolver();
+            // insert data to be sent
+            Cursor cursor = resolver.query(packetUri, FindContract.Packets.PROJECTION_DEFAULT, null, null, null);
+            List<Packet> list = buildPacketListFromCursor(cursor);
+            cursor.close();
+            return list;
+        }
+        else
+        {
+
+            Log.d(TAG, "Could not retrieve outgoing packets. Make sure platform is installed");
+            return null;
+        }
+    }
+
+    private List<Packet> buildPacketListFromCursor(Cursor cursor) {
+        ArrayList<Packet> list = new ArrayList<>();
+        while (cursor.moveToNext()) {
+            final Packet packet = Packet.fromCursor(cursor);
+            list.add(packet);
+        }
+        return list;
     }
 
 }
