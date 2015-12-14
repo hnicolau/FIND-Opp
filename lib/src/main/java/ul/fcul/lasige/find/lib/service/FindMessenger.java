@@ -13,11 +13,10 @@ import android.util.Log;
 import java.util.ArrayDeque;
 
 /**
- * Created by hugonicolau on 03/11/2015.
- *
  * This class holds a ServiceConnection and a handler to communicate with FIND service. It is used
  * by the FindConnector Singleton class.
  *
+ * Created by hugonicolau on 03/11/2015.
  */
 public class FindMessenger implements ServiceConnection {
     private static final String TAG = FindMessenger.class.getSimpleName();
@@ -70,7 +69,7 @@ public class FindMessenger implements ServiceConnection {
      * Message sending state
      */
     // a queue for all messages that need to be sent to FIND service
-    private static final ArrayDeque<Message> sMessageQueue = new ArrayDeque<Message>();
+    private static final ArrayDeque<Message> sMessageQueue = new ArrayDeque<>();
     // runnable that will be used to send messages from the queue
     private MessageSenderRunnable mMessageSenderRunnable;
 
@@ -244,7 +243,7 @@ public class FindMessenger implements ServiceConnection {
                         // waits for new messages via notify()
                         sMessageQueue.wait();
                     } catch (InterruptedException e) {
-                        continue;
+                        Log.e(TAG, "Exception while waiting to be notified, we will continue sending messages: " + e.getMessage());
                     }
                 }
             }

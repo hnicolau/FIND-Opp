@@ -1,6 +1,5 @@
 package ul.fcul.lasige.find.lib.service;
 
-import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -319,7 +318,7 @@ public class FindConnector implements Handler.Callback {
             // internet connection status
             case FindMessenger.MSG_INTERNET_CONNECTION: {
                 final int connected = msg.arg1;
-                mInternetObserver.onChange(connected == 1 ? true : false);
+                mInternetObserver.onChange(connected == 1);
                 break;
             }
             default: {
@@ -505,6 +504,7 @@ public class FindConnector implements Handler.Callback {
             ContentResolver resolver = mContext.getContentResolver();
             // insert data to be sent
             Cursor cursor = resolver.query(packetUri, FindContract.Packets.PROJECTION_DEFAULT, null, null, null);
+            if(cursor == null) return new ArrayList<>();
             List<Packet> list = buildPacketListFromCursor(cursor);
             cursor.close();
             return list;
