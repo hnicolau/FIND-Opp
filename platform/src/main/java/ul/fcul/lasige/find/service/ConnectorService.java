@@ -15,6 +15,7 @@ import android.util.Log;
 
 import java.util.HashMap;
 
+import ul.fcul.lasige.find.beaconing.BeaconingManager;
 import ul.fcul.lasige.find.data.ClientImplementation;
 import ul.fcul.lasige.find.lib.service.FindMessenger;
 
@@ -28,7 +29,8 @@ import ul.fcul.lasige.find.lib.service.FindMessenger;
  * This service is only meant to be bound to by client apps. Other platform components can directly
  * use the {@link SupervisorService}.
  */
-public class ConnectorService extends Service implements Handler.Callback, SupervisorService.Callback {
+public class ConnectorService extends Service implements Handler.Callback, SupervisorService.Callback,
+        BeaconingManager.InternetCallback {
     private static final String TAG = ConnectorService.class.getSimpleName();
 
     /**
@@ -57,7 +59,10 @@ public class ConnectorService extends Service implements Handler.Callback, Super
             @Override
             public void onServiceConnected(ComponentName name, IBinder service) {
                 mSupervisor = ((SupervisorService.SupervisorBinder) service).getSupervisor();
+                // add supervisor
                 mSupervisor.addCallback(ConnectorService.this);
+                // add internet callback
+                mSupervisor.getBeaconingManager().addInternetCallback(ConnectorService.this);
             }
         };
         SupervisorService.bindSupervisorService(this, mSupervisorConnection);
@@ -65,6 +70,9 @@ public class ConnectorService extends Service implements Handler.Callback, Super
 
     @Override
     public void onDestroy() {
+        mSupervisor.getBeaconingManager().removeInternetCallback(this);
+        mSupervisor.getBeaconingManager().resetInternetLock();
+
         unbindService(mSupervisorConnection);
         mSupervisorConnection = null;
 
@@ -76,12 +84,27 @@ public class ConnectorService extends Service implements Handler.Callback, Super
         return mMessenger.getBinder();
     }
 
+    /*
+     * Supervisor callback
+     */
     @Override
     public void onActivationStateChanged(boolean activated) {
         for (String clientApiKey : mConnectedClients.keySet()) {
             reply(clientApiKey, FindMessenger.MSG_ACTIVATE_DISCOVERY, activated);
         }
     }
+
+    /*
+     * Beaconing callback
+     */
+    @Override
+    public void onInternetConnection(boolean connected) {
+        Log.d(TAG, "==== onInternet connection: " + connected);
+        for (String clientApiKey : mConnectedClients.keySet()) {
+            reply(clientApiKey, FindMessenger.MSG_INTERNET_CONNECTION, connected);
+        }
+    }
+
 
     @Override
     public boolean handleMessage(Message msg) {
@@ -142,7 +165,23 @@ public class ConnectorService extends Service implements Handler.Callback, Super
                 break;
             }
 
+            case FindMessenger.MSG_ACQUIRE_INTERNET: {
+                mSupervisor.getBeaconingManager().acquireInternetLock(appName);
+                break;
+            }
+
+            case FindMessenger.MSG_RELEASE_INTERNET: {
+                Log.d(TAG, "received release message");
+                mSupervisor.getBeaconingManager().releaseInternetLock(appName);
+                break;
+            }
+
+            case FindMessenger.MSG_INTERNET_CONNECTION: {
+                Log.d(TAG, "client requested internet state");
+                reply(apiKey, FindMessenger.MSG_INTERNET_CONNECTION, mSupervisor.getBeaconingManager().hasInternetAccess());
+            }
             default: {
+                Log.d(TAG, "Received an unrecognized message");
                 return false;
             }
         }

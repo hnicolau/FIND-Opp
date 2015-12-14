@@ -1,7 +1,11 @@
 package ul.fcul.lasige.find.beaconing;
 
 import android.bluetooth.BluetoothDevice;
-import android.database.Cursor;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.wifi.ScanResult;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,13 +20,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import ul.fcul.lasige.find.data.FullContract;
 import ul.fcul.lasige.find.lib.data.Neighbor;
-import ul.fcul.lasige.find.lib.data.NeighborObserver;
 import ul.fcul.lasige.find.network.NetworkManager;
 import ul.fcul.lasige.find.network.NetworkStateChangeReceiver;
 import ul.fcul.lasige.find.network.ScanResults;
@@ -80,8 +81,6 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
     private int mApIterations;
     private boolean mIsWifiStillConnecting;
 
-    //private NeighborObserver mNeighborObserver;
-
     public BeaconingIntervalHandler(BeaconingManager beaconingManager, int beaconingId) {
         super(TAG);
         mBeaconingId = beaconingId;
@@ -97,8 +96,6 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
         Looper.prepare();
         mHandler = new Handler();
 
-       /* mNeighborObserver = new NeighborObserver(mBeaconingManager.mContext, mHandler);
-        mNeighborObserver.register();*/
         activateNetworks();
 
         // schedule and wait for next iteration
@@ -204,14 +201,15 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
                 //TODO mBtBeaconingState = BtBeaconingState.DISABLING;
 
                 mBeaconingManager.stopBeaconSenders();
-                //mNeighborObserver.unregister();
 
-                if (!mBeaconingManager.isWifiConnectionLocked()) {
+                if (!mBeaconingManager.isInternetLocked() && !mBeaconingManager.isWifiConnectionLocked()) {
                     restoreNetworks();
                 }
 
                 mHandler.getLooper().quit();
                 mHandler = null;
+
+                mBeaconingManager.notifyInternetCallbacks();
 
                 if (!aborted) {
                     mBeaconingManager.onBeaconingIntervalFinished(mBeaconingId);
@@ -235,6 +233,7 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
 
     private boolean canUseFeatureNow(Policy.Feature feature) {
         Policy policy = mBeaconingManager.mPolicy;
+        if(policy == null) return false;
         return (policy.allows(feature) && !isBotheringUser(policy));
     }
 
@@ -264,11 +263,12 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
             }
         }
         if (selectedNetwork == null) {
-            // Visited all other networks before, so stick to the first one, but only if it's FIND
+            // Visited all other networks before, so stick to the first one
             final ScanResult firstNetwork = scanResults.getConnectibleNetworks().get(0);
-            if (NetworkManager.isFindSSID(firstNetwork.SSID)) {
+            // but only if it's FIND (removed because an open network can have Internet access
+            /*if (NetworkManager.isFindSSID(firstNetwork.SSID)) {
                 selectedNetwork = firstNetwork;
-            }
+            }*/
         }
 
         return selectedNetwork;
@@ -316,7 +316,8 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
 
     @Override
     public void onWifiScanCompleted() {
-        if (mBeaconingManager.isWifiConnectionLocked() || !canUseFeatureNow(Policy.Feature.WIFI_CLIENT)) {
+
+        if (mBeaconingManager.isInternetLocked() || mBeaconingManager.isWifiConnectionLocked() || !canUseFeatureNow(Policy.Feature.WIFI_CLIENT)) {
             // Switching is not possible right now
             return;
         }
@@ -340,6 +341,13 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
                     mBeaconingManager.stopWifiReceiver();
                     mBeaconingManager.stopWifiSender();
                 }
+                else {
+                    // we are already connected to selected network
+                    mWifiBeaconingState = WifiBeaconingState.CONNECTED;
+                    onNetworkConnected();
+                }
+                // notify client internet observers
+                mBeaconingManager.notifyInternetCallbacks();
                 return;
             }
         }
@@ -356,6 +364,9 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
 
     @Override
     public void onWifiNetworkChanged(boolean connected, boolean isFailover) {
+        // check Internet connection and notify observers
+        mBeaconingManager.notifyInternetCallbacks();
+
         if (connected && mWifiBeaconingState == WifiBeaconingState.CONNECTING) {
             mWifiBeaconingState = WifiBeaconingState.CONNECTED;
             onNetworkConnected();
@@ -378,6 +389,9 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
 
     @Override
     public void onAccessPointModeChanged(boolean activated) {
+        // check Internet connection and notify observers
+        mBeaconingManager.notifyInternetCallbacks();
+
         if (activated && mWifiBeaconingState == WifiBeaconingState.AP_ENABLING) {
             mWifiBeaconingState = WifiBeaconingState.AP_ENABLED;
             onNetworkConnected();
@@ -399,6 +413,7 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
         mBeaconingManager.startWifiSender(true);
 
         mVisitedNetworks.push(connection.get().getNetworkName().get());
+
         return true;
     }
 
@@ -471,27 +486,27 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
                     mWifiIterationCount, neighborCount));
 
             // Bootstrap next iteration
-            if (!mBeaconingManager.isWifiConnectionLocked()) {
+            if (!mBeaconingManager.isInternetLocked() && !mBeaconingManager.isWifiConnectionLocked()) {
                 switch (mWifiBeaconingState) {
                     case CONNECTING:
                     case ENABLING:
                     case ENABLED:
                     case CONNECTED: {
-                        if (mWifiBeaconingState == WifiBeaconingState.CONNECTING
-                                && !mIsWifiStillConnecting) {
+                        if (mWifiBeaconingState == WifiBeaconingState.CONNECTING && !mIsWifiStillConnecting) {
                             // Let it connect
                             Log.v(TAG, "Still connecting");
                             mIsWifiStillConnecting = true;
+                            mBeaconingManager.notifyInternetCallbacks();
                             break;
                         }
                         mIsWifiStillConnecting = false;
 
                         // Don't stay too long on the same network
                         if ((neighborCount == 0) || (visitedNetworksCount() <= mWifiIterationCount - 1)) {
-                            if (lastNetworkName != null && NetworkManager.isFindSSID(lastNetworkName)) {
+                            /*if (lastNetworkName != null && NetworkManager.isFindSSID(lastNetworkName)) {
                                 // Connecting/connected to FIND network - stay there
                                 break;
-                            }
+                            }*/
 
                             if (canUseFeature(Policy.Feature.WIFI_AP)) {
                                 final double pEnableAp = canUseFeature(Policy.Feature.WIFI_CLIENT) ?

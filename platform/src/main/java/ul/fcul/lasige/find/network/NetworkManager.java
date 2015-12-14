@@ -1,7 +1,9 @@
 package ul.fcul.lasige.find.network;
 
 import android.bluetooth.BluetoothAdapter;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.DhcpInfo;
 import android.net.NetworkInfo;
@@ -15,6 +17,7 @@ import android.util.Log;
 import com.google.common.base.Optional;
 import com.google.common.primitives.Ints;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
@@ -227,6 +230,12 @@ public class NetworkManager {
         return networkInfo.isConnected();
     }
 
+    private boolean isWifiConnected(ScanResult network) {
+        return isWifiConnected() && network.SSID.equals(NetworkManager.unquoteSSID(mWifiManager.getConnectionInfo().getSSID()))
+                && network.BSSID.equals(mWifiManager.getConnectionInfo().getBSSID());
+        //return wifiConfiguration.status == WifiConfiguration.Status.CURRENT;
+    }
+
     /**
      * Returns the current state of the WiFi adapter
      *
@@ -340,10 +349,10 @@ public class NetworkManager {
         int networkId = -1;
         for (WifiConfiguration wifiConfiguration : getConfiguredWifiNetworks()) {
             if (network.SSID.equals(NetworkManager.unquoteSSID(wifiConfiguration.SSID))) {
-                if (wifiConfiguration.BSSID == null
-                        || wifiConfiguration.BSSID.equals(network.BSSID)) {
-                    if (wifiConfiguration.status == WifiConfiguration.Status.CURRENT) {
+                if (wifiConfiguration.BSSID == null || wifiConfiguration.BSSID.equals(network.BSSID)) {
+                    if (isWifiConnected(network)) {
                         // Already connected to the requested network
+                        Log.d(TAG, "already connected");
                         return true;
                     }
                     networkId = wifiConfiguration.networkId;
@@ -351,6 +360,7 @@ public class NetworkManager {
             }
         }
 
+        Log.d(TAG, "Network configuration: " + networkId);
         if (networkId < 0) {
             // It's not configured, so add new configuration before connecting
             // NOTE: The assumption here is that the requested network is open.
@@ -524,6 +534,43 @@ public class NetworkManager {
         baseWifiConfig.SSID = baseApName + "-" + TokenGenerator.generateToken(4);
         baseWifiConfig.allowedKeyManagement.set(keyMgmt);
         return baseWifiConfig;
+    }
+
+    // UTILS
+    public boolean hasInternetAccess() {
+        NetworkInfo netInfo = mConnectivityManager.getActiveNetworkInfo();
+        //should check null because in air plan mode it will be null
+        if(netInfo != null && netInfo.isConnected()) {
+            // try to ping
+            return ping();
+        }
+        return false;
+    }
+
+    private boolean ping() {
+        Runtime runtime = Runtime.getRuntime();
+        try
+        {
+            Process  mIpAddrProcess = runtime.exec("/system/bin/ping -c 1 8.8.8.8"); // google dns
+            int mExitValue = mIpAddrProcess.waitFor();
+            System.out.println("mExitValue "+mExitValue);
+            if(mExitValue==0){
+                return true;
+            }else{
+                return false;
+            }
+        }
+        catch (InterruptedException ignore)
+        {
+            ignore.printStackTrace();
+            System.out.println(" Exception:"+ignore);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            System.out.println(" Exception:"+e);
+        }
+        return false;
     }
 
     // UNUSED

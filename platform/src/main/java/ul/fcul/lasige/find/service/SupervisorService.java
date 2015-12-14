@@ -194,6 +194,8 @@ public class SupervisorService extends Service {
         }
     }
 
+    public BeaconingManager getBeaconingManager() { return mBeaconingManager; }
+
     public boolean isActivated() {
         return ACTIVE_STATES.contains(mState);
     }

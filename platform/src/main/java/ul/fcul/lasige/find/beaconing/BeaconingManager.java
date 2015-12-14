@@ -5,6 +5,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Message;
 import android.os.PowerManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
@@ -13,6 +14,11 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -106,6 +112,11 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     private int mCurrentApLikelihood;
     protected boolean mIsDesignatedAp;
 
+    // callbacks
+    // internet callback
+    private Set<InternetCallback> mInternetCallbacks = new HashSet<>();
+    protected Map<String, Integer> mInternetLockCount = new HashMap<String, Integer>();
+    protected boolean mHasInternet = false;
     /*
      * LIFECYCLE
      */
@@ -126,6 +137,36 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         mMasterIdentity = mDbController.getMasterIdentity();
         mBeaconBuilder = new BeaconBuilder(this);
         mPacketCommManager = new PacketCommManager(mContext, this);
+        mHasInternet = mNetManager.hasInternetAccess();
+    }
+
+    /*
+     * INTERNET CALLBACK
+     */
+    public static interface InternetCallback { public void onInternetConnection(boolean connected); }
+
+    public void addInternetCallback(InternetCallback internetCallback) {
+        Log.d(TAG, "Internet callback added");
+        mInternetCallbacks.add(internetCallback);
+    }
+
+    public void removeInternetCallback(InternetCallback internetCallback) { mInternetCallbacks.remove(internetCallback); }
+
+    private void notifyInternetCallbacks(boolean connected) {
+        Log.d(TAG, "Going to notify " + connected);
+        for (InternetCallback callback : mInternetCallbacks) {
+            callback.onInternetConnection(connected);
+        }
+    }
+
+    public void notifyInternetCallbacks() {
+        Log.d(TAG, "Going to check internet");
+        notifyInternetCallbacks(hasInternetAccess());
+    }
+
+    public boolean hasInternetAccess() {
+        mHasInternet = mNetManager.hasInternetAccess();
+        return mHasInternet;
     }
 
     /*
@@ -445,6 +486,29 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         return true;
     }
 */
+
+    /*
+     * INTERNET STATE LOCK
+     */
+    public synchronized void acquireInternetLock(String appName) {
+        Log.d(TAG, "acquiring lock : " + appName);
+        mInternetLockCount.put(appName, mInternetLockCount.size());
+    }
+
+    public synchronized void releaseInternetLock(String appName) {
+        Log.d(TAG, "releasing lock " + appName);
+        mInternetLockCount.remove(appName);
+    }
+
+    public synchronized void resetInternetLock() {
+        Log.d(TAG, "reset Internet lock!");
+        mInternetLockCount = new HashMap<>();
+    }
+
+    public boolean isInternetLocked() {
+        return !mInternetLockCount.isEmpty();
+    }
+
     /*
      * CONNECTION LOCKS
      */
@@ -495,12 +559,13 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
      */
 
     @Override
-    public void onWifiAdapterChanged(boolean enabled) {
-        // TODO
-    }
+    public void onWifiAdapterChanged(boolean enabled) { }
 
     @Override
     public void onWifiNetworkChanged(boolean connected, boolean isFailover) {
+        // check Internet connection and notify observers
+        notifyInternetCallbacks();
+
         if (mState == BeaconingState.PASSIVE) {
             if (connected) {
                 startWifiReceiver();
@@ -527,7 +592,8 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
 
     @Override
     public void onAccessPointModeChanged(boolean activated) {
-        // We don't handle this here.
+        // check Internet connection and notify observers
+        notifyInternetCallbacks();
     }
 
     /*
