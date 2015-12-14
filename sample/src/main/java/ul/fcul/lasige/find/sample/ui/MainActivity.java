@@ -17,6 +17,7 @@ import android.widget.TextView;
 import java.util.Locale;
 import java.util.Set;
 
+import ul.fcul.lasige.find.lib.data.InternetObserver;
 import ul.fcul.lasige.find.lib.data.Neighbor;
 import ul.fcul.lasige.find.lib.data.NeighborObserver;
 import ul.fcul.lasige.find.lib.data.Packet;
@@ -27,7 +28,7 @@ import ul.fcul.lasige.find.sample.data.DatabaseHelper;
 import ul.fcul.lasige.find.sample.data.Message;
 
 public class MainActivity extends AppCompatActivity implements PacketObserver.PacketCallback,
-        NeighborObserver.NeighborCallback {
+        NeighborObserver.NeighborCallback, InternetObserver.InternetCallback {
     private static final String TAG = MainActivity.class.getSimpleName();
 
     // app-level variables
@@ -96,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements PacketObserver.Pa
         super.onResume();
         // FIND
         Log.d(TAG, "Trying to bind with FIND platform ...");
-        if (mConnector.bind()) {
+        if (mConnector.bind(this)) {
             Log.d(TAG, "Bind was successful");
             mConnector.registerProtocolsFromResources(R.xml.protocols, this, this);
         }
@@ -210,4 +211,26 @@ public class MainActivity extends AppCompatActivity implements PacketObserver.Pa
     }
 
 
+    @Override
+    public void onInternetConnection(boolean connected) {
+        Log.d(TAG, "OnInternetConnection: " + connected);
+        if(connected) {
+            Log.d(TAG, "Acquiring lock");
+            // example on how to attempt to acquire internet lock from platform
+            mConnector.acquireInternetLock();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(120000);
+                        Log.d(TAG, "Going to release lock");
+                        mConnector.releaseInternetLock();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        }
+    }
 }
