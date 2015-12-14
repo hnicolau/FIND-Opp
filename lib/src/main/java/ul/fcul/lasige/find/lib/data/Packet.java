@@ -9,7 +9,7 @@ import ul.fcul.lasige.find.lib.data.FindContract.Packets;
 /**
  * Created by hugonicolau on 03/11/2015.
  *
- * This class represents a communication packet
+ * This class represents a communication packet.
  */
 public class Packet {
     private final static BaseEncoding HEX_CODER = BaseEncoding.base16();
@@ -23,8 +23,6 @@ public class Packet {
     // serialized data
     private final byte[] mData;
 
-    // TODO target node?
-
     // constructor
     public Packet(long packetId, long timeReceived, byte[] sourceNode, byte[] data){
         mPacketId = packetId;
@@ -33,16 +31,39 @@ public class Packet {
         mData = data;
     }
 
+    /**
+     * Retrieves the packet ID.
+     * @return Packet ID.
+     */
     public long getPacketId() { return mPacketId; }
+
+    /**
+     * Retrieves the time the packet was received as a timestamp.
+     * @return Time packet was received.
+     */
     public long getTimeReceived() { return mTimeReceived; }
+
+    /**
+     * Retrieves the source node ID for the packet as a byte array.
+     * @return Source node ID.
+     */
     public byte[] getSourceNode() { return mSourceNode; }
 
+    /**
+     * Retrieves the source node ID for the packet as a String (hexadecimal)
+     * @return Source node ID.
+     */
     public String getSourceNodeAsHex() {
         if (mSourceNode != null) {
             return HEX_CODER.encode(mSourceNode);
         }
         return null;
     }
+
+    /**
+     * Retrieves the data contained by the packet as a byte array (serialized).
+     * @return Packet's data.
+     */
     public byte[] getData() { return mData; }
 
     /**

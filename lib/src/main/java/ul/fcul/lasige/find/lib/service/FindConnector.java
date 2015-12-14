@@ -107,10 +107,10 @@ public class FindConnector implements Handler.Callback {
         if (mPlatformAvailable) {
             Log.d(TAG, "Successfully bound with the FIND platform");
             mMessenger.setApiKey(TokenStore.getApiKey(mContext));
-            // internet observer
+            // create new internet observer
             mInternetObserver = new InternetObserver(callback);
             mInternetObserver.register();
-            mMessenger.sendCommand(FindMessenger.MSG_INTERNET_CONNECTION); // request Internet state
+            mMessenger.sendCommand(FindMessenger.MSG_INTERNET_CONNECTION); // request Internet status
         } else {
             Log.d(TAG, "Could not bound with the FIND platform");
             Toast.makeText(mContext, "The FIND platform is currently not installed.", Toast.LENGTH_SHORT).show();
@@ -225,6 +225,9 @@ public class FindConnector implements Handler.Callback {
         }
     }
 
+    /**
+     * Requests FIND service to start
+     */
     public void requestStart() {
         if (mPlatformAvailable) {
             mInternetObserver.register();
@@ -235,6 +238,9 @@ public class FindConnector implements Handler.Callback {
         }
     }
 
+    /**
+     * Requests FIND service to stop
+     */
     public void requestStop() {
         if (mPlatformAvailable) {
             mInternetObserver.unregister();
@@ -303,12 +309,14 @@ public class FindConnector implements Handler.Callback {
                 }
                 break;
             }
+            // platform status
             case FindMessenger.MSG_ACTIVATE_DISCOVERY: {
                 final int active = msg.arg1;
                 Log.d(TAG, "Received state update from FIND platform, platform is " + (active == 1 ? "on" : "off"));
                 // TODO notify client app
                 break;
             }
+            // internet connection status
             case FindMessenger.MSG_INTERNET_CONNECTION: {
                 final int connected = msg.arg1;
                 mInternetObserver.onChange(connected == 1 ? true : false);
@@ -463,6 +471,12 @@ public class FindConnector implements Handler.Callback {
         }
     }
 
+    /**
+     * Gets list of outgoing packets for first registered protocol. These include previously enqueued packets and packets
+     * that need to be forwarded to other client applications.
+     *
+     * @return list of outgoing packets.
+     */
     public List<Packet> getOutgoingPackets() {
         if (mPlatformAvailable) {
             final String protocolToken = mProtocolRegistry.getSingleToken();
@@ -475,6 +489,13 @@ public class FindConnector implements Handler.Callback {
         }
     }
 
+    /**
+     * Gets list of outgoing packets for a give protocol token. These include previously enqueued packets and packets
+     * that need to be forwarded to other client applications.
+     *
+     * @param protocolToken protocol token.
+     * @return list of outgoing packets.
+     */
     public List<Packet> getOutgoingPackets(String protocolToken) {
         if (mPlatformAvailable) {
             if(protocolToken == null) return new ArrayList<>();
@@ -496,6 +517,12 @@ public class FindConnector implements Handler.Callback {
         }
     }
 
+    /**
+     * Utility method that builds a list of packets from a database cursor.
+     *
+     * @param cursor database cursor.
+     * @return correspondent list of packets.
+     */
     private List<Packet> buildPacketListFromCursor(Cursor cursor) {
         ArrayList<Packet> list = new ArrayList<>();
         while (cursor.moveToNext()) {
@@ -505,6 +532,14 @@ public class FindConnector implements Handler.Callback {
         return list;
     }
 
+    /**
+     * Attempts to acquire an internet lock forcing the FIND platform to stay with the current internet connection
+     * and stop connecting to other neighbors nearby until a release. This method should be used with extreme
+     * caution since it may affect all client application that are using the platform. Make sure you release the lock.
+     *
+     * <p>Lock is not reference-counted, so acquiring multiple times is safe: If it is
+     * already acquired, nothing happens.</p>
+     */
     public void acquireInternetLock() {
         if(mPlatformAvailable) {
             mMessenger.sendCommand(FindMessenger.MSG_ACQUIRE_INTERNET);
@@ -514,6 +549,15 @@ public class FindConnector implements Handler.Callback {
         }
     }
 
+    /**
+     * Releases internet lock. The platform will continue to connect to other nearby neighbors.
+     *
+     * <p>Lock is not reference-counted, so releasing multiple times is safe: The first call
+     * to releaseInternetLock() will actually release the lock, the others get ignored.
+     *
+     * <p>The first call to release once will relase all previous acquired locks
+     * for this client application. </p>
+     */
     public void releaseInternetLock() {
         if(mPlatformAvailable) {
             Log.d(TAG, "sending release message");

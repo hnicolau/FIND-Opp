@@ -39,19 +39,6 @@ public class NeighborObserver extends ContentObserver {
     /*
      * CONSTRUCTORS
      */
-    /*public NeighborObserver(Context context) {
-        super(new Handler());
-        mContext = context.getApplicationContext();
-        mObservedUri = FindContract.NeighborProtocols.URI_CURRENT;
-        mCallback = null;
-    }
-
-    public NeighborObserver(Context context, Handler handler) {
-        super(handler);
-        mContext = context.getApplicationContext();
-        mCallback = null;
-    }*/
-
     public NeighborObserver(Context context, NeighborCallback callback) {
         super(new Handler());
         mContext = context.getApplicationContext();
