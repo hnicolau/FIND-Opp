@@ -16,6 +16,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import ul.fcul.lasige.findvictim.app.VictimApp;
 import ul.fcul.lasige.findvictim.data.Alert;
 import ul.fcul.lasige.findvictim.data.DatabaseHelper;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
@@ -33,33 +34,13 @@ public class GcmScheduler {
     // singleton instance
     private static GcmScheduler sInstance = null;
 
-    // sensor service
-    private ServiceConnection mSensorsConnection;
-    private SensorsService mSensors = null;
-
     // alarm manager
     AlarmManager mAlarmManager;
     private PendingIntent mStartSensorsIntent = null;
     private PendingIntent mStopSensorsIntent = null;
 
-    public GcmScheduler() {}
     private GcmScheduler(Context context) {
         mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-
-        // bind to sensors service
-        mSensorsConnection = new ServiceConnection() {
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                mSensors = null;
-            }
-
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                final SensorsService.SensorsBinder binder = (SensorsService.SensorsBinder) service;
-                mSensors = binder.getSensors();
-            }
-        };
-        SensorsService.bindSensorsService(context, mSensorsConnection);
     }
 
     public static GcmScheduler getInstance(Context context) {
@@ -90,7 +71,7 @@ public class GcmScheduler {
         stopIntent.putExtra(EXTRA_ALERT_NAME, alert.getName());
 
         mStopSensorsIntent = PendingIntent.getBroadcast(context, 1234,
-                stopIntent, PendingIntent.FLAG_UPDATE_CURRENT); // TODO alarmmanager only guarantees one start alert
+                stopIntent, PendingIntent.FLAG_UPDATE_CURRENT); // TODO alarmmanager only guarantees one stop alarm
 
         // get stopping time
         long duration = alert.getDuration();
@@ -116,17 +97,11 @@ public class GcmScheduler {
         }
 
         // stop sensors service
-        if(mSensors != null) {
-            mSensors.deactivateSensors();
-        }
-    }
-
-    public SensorsService getSensorService() {
-        return mSensors;
+        VictimApp app = (VictimApp)context.getApplicationContext();
+        app.stopSensors();
     }
 
     public static class GcmSchedulerReceiver extends BroadcastReceiver {
-        public GcmSchedulerReceiver() {}
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -136,28 +111,27 @@ public class GcmScheduler {
                 String action = intent.getAction();
 
                 if(action != null && action.equalsIgnoreCase(ACTION_SCHEDULE_START)) {
+                    Log.d(TAG, "Received alarm to start sensors");
+
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
                             intent.getStringExtra(EXTRA_ALERT_NAME), Alert.STATUS.ONGOING);
 
                     // start sensors service
-                    SensorsService ss = GcmScheduler.getInstance(context).getSensorService();
-                    if(ss != null) {
-                        Log.d(TAG, "Received alarm to start sensors");
-                        ss.activateSensors();
-                    }
+                    VictimApp app = (VictimApp)context.getApplicationContext();
+                    app.starSensors();
+
                 }
                 else if(action != null && action.equalsIgnoreCase((ACTION_SCHEDULE_STOP))) {
+                    Log.d(TAG, "Received alarm to stop sensors");
+
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
                             intent.getStringExtra(EXTRA_ALERT_NAME), Alert.STATUS.STOPPED);
 
                     // stop sensors service
-                    SensorsService ss = GcmScheduler.getInstance(context).getSensorService();
-                    if(ss != null) {
-                        Log.d(TAG, "Received alarm to stop sensors");
-                        ss.deactivateSensors();
-                    }
+                    VictimApp app = (VictimApp)context.getApplicationContext();
+                    app.stopSensors();
                 }
             }
         }

@@ -31,6 +31,8 @@ import ul.fcul.lasige.findvictim.utils.ServerUtils;
  */
 public class RequestServer {
     private static final String TAG = RequestServer.class.getSimpleName();
+    public static String ACTION_PACKETS_SENT = "ul.fcul.lasige.findvictim.action.packetssent";
+    public static String EXTRA_PACKETS_SENT = "ul.fcul.lasige.findvictim.extra.packetssent";
 
     public static void register(final Context context, final String locale, final String mac, final String email, final String token) {
 
@@ -167,7 +169,7 @@ public class RequestServer {
         }
     }
 
-    public static void sendPackets(final Context context, ArrayList<Message> messages, final ConnectivityChangeReceiver receiver) {
+    public static void sendPackets(final Context context, ArrayList<Message> messages) {
         Log.d(TAG, "Going to send packets from: " + TokenStore.getMacAddress(context));
         String method = "victims";
         // build web service data - JSON
@@ -185,22 +187,33 @@ public class RequestServer {
                 @Override
                 public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                     Log.d(TAG, "Success on uploading victim information (JSONObject): " + response.toString());
-                    if(receiver != null) context.unregisterReceiver(receiver);
+                    notifyPacketsSent(context, true);
                 }
 
                 @Override
                 public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
                     Log.d(TAG, "Failure on uploading victim information (JSONObject) code: " + statusCode + " response: " + errorResponse);
+                    notifyPacketsSent(context, false);
                 }
 
                 @Override
                 public void onFailure(int statusCode, Header[] headers, String str, Throwable throwable) {
                     Log.d(TAG, "Failure on register (String) code: " + statusCode + " response: " + str);
+                    notifyPacketsSent(context, false);
                 }
             });
-        } catch (UnsupportedEncodingException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+            notifyPacketsSent(context, false);
         }
+    }
+
+    private static void notifyPacketsSent(Context context, boolean success) {
+        // notify that we finished trying sending packets
+        Log.d(TAG, "Notifying UI of packets sent");
+        Intent packetsSent = new Intent(ACTION_PACKETS_SENT);
+        packetsSent.putExtra(EXTRA_PACKETS_SENT, success);
+        LocalBroadcastManager.getInstance(context).sendBroadcast(packetsSent);
     }
 
     private static void notifyUI(Context context) {

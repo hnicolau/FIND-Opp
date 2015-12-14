@@ -15,6 +15,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import ul.fcul.lasige.findvictim.app.VictimApp;
 import ul.fcul.lasige.findvictim.data.Alert;
 import ul.fcul.lasige.findvictim.data.DatabaseHelper;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;

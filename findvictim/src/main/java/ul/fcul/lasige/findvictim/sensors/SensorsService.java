@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -30,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import ul.fcul.lasige.find.lib.data.InternetObserver;
 import ul.fcul.lasige.find.lib.data.Neighbor;
 import ul.fcul.lasige.find.lib.data.NeighborObserver;
 import ul.fcul.lasige.find.lib.data.Packet;
@@ -50,7 +52,7 @@ import ul.fcul.lasige.findvictim.webservices.RequestServer;
  * Created by hugonicolau on 26/11/15.
  */
 public class SensorsService extends Service implements PacketObserver.PacketCallback,
-        NeighborObserver.NeighborCallback{
+        NeighborObserver.NeighborCallback, InternetObserver.InternetCallback {
     private static final String TAG = SensorsService.class.getSimpleName();
 
     // start action
@@ -80,6 +82,9 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
     // connectivity receiver
     private static ConnectivityChangeReceiver mConnectivityReceiver = null;
+
+    private BroadcastReceiver mUploadBroadcastReceiver;
+    private boolean mHasInternet = false;
 
     /*
      * EXTERNAL API
@@ -143,6 +148,28 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         mSensorManager.addSensor(SensorManager.SensorType.Battery, new BatterySensor(getApplicationContext()), false);
         mSensorManager.addSensor(SensorManager.SensorType.Location, new LocationSensor(getApplicationContext()), false);
 
+        mUploadBroadcastReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Log.d(TAG, "Finish uploading");
+                if(intent != null && intent.getAction().equals(RequestServer.ACTION_PACKETS_SENT)) {
+                    boolean success = intent.getBooleanExtra(RequestServer.EXTRA_PACKETS_SENT, false);
+                    if(success) {
+                        Log.d(TAG, "---------------- Packets sent! -----------------");
+                        if(mConnectivityReceiver != null) getApplicationContext().unregisterReceiver(mConnectivityReceiver);
+                    }
+                    else if(mHasInternet){
+                        // if fail keep trying while you have an internet connection, but release lock
+                        sync();
+                    }
+                    Log.d(TAG, "Released Internet LOCK");
+                    mConnector.releaseInternetLock();
+                }
+            }
+        };
+        LocalBroadcastManager.getInstance(getApplicationContext()).registerReceiver(
+                mUploadBroadcastReceiver, new IntentFilter(RequestServer.ACTION_PACKETS_SENT));
+
         SensorsState previousState = TokenStore.getSensorsState(getApplicationContext());
         // start sensing
         scheduleStateTransition(previousState);
@@ -162,6 +189,8 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         mHandlerThread.quit();
 
         if(mConnectivityReceiver != null) getApplicationContext().unregisterReceiver(mConnectivityReceiver);
+
+        LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mUploadBroadcastReceiver);
 
         // unbind from platform
         unbindFromFind();
@@ -251,7 +280,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     private void bindToFind() {
         // FIND
         Log.d(TAG, "Trying to bind with FIND platform ...");
-        if (mConnector.bind()) {
+        if (mConnector.bind(this)) {
             Log.d(TAG, "Bind was successful");
             mConnector.registerProtocolsFromResources(R.xml.protocols, this, this);
         }
@@ -319,6 +348,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
                 }
                 // check whether we are inside the alert area
                 Alert alert = Alert.fromCursor(cursor);
+
                 if(PositionUtils.isInLocation(message.LocationLatitude, message.LocationLongitude, alert.getLatStart(),
                         alert.getLonStart(), alert.getLatEnd(), alert.getLonEnd())) {
                     TokenStore.setIsFirstLocation(getApplicationContext(), false);
@@ -343,6 +373,9 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
             // try to connect to current neighbors
             mConnector.requestDiscovery();
             Log.d(TAG, "Enqueued message");
+
+            // try to send to server
+            if(mHasInternet) sync();
         }
         else {
             Log.d(TAG, "No longer connected to enqueue message");
@@ -460,6 +493,18 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
     }
 
+    @Override
+    public void onInternetConnection(boolean connected) {
+        Log.d(TAG, "----- OnInternetConnection: " + connected);
+
+        mHasInternet = connected;
+        if(connected && isActivated()) {
+            // lock connection
+            mConnector.acquireInternetLock();
+            sync();
+        }
+    }
+
     /*
      * INTERNET CONNECTION
      */
@@ -488,16 +533,21 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     public synchronized void sync() {
         Log.d(TAG, "Going to sync with server");
 
-        // get all outgoing messages
-        ArrayList<Packet> packets = new ArrayList<Packet>(mConnector.getOutgoingPackets());
-        ArrayList<Message> messages = new ArrayList<>();
-        for(Packet packet : packets) {
-            final Message message = Message.deserialize(packet.getData());
-            messages.add(message);
-        }
-
         // call web service and unregister receiver in case of success
-        RequestServer.sendPackets(getApplicationContext(), messages, mConnectivityReceiver);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                // get all outgoing messages
+                ArrayList<Packet> packets = new ArrayList<Packet>(mConnector.getOutgoingPackets());
+                final ArrayList<Message> messages = new ArrayList<>();
+                for(Packet packet : packets) {
+                    final Message message = Message.deserialize(packet.getData());
+                    messages.add(message);
+                }
+
+                RequestServer.sendPackets(getApplicationContext(), messages);
+            }
+        }).start();
 
     }
 
