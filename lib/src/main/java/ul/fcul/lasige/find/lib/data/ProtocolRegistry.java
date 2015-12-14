@@ -1,6 +1,7 @@
 package ul.fcul.lasige.find.lib.data;
 
 import android.content.Context;
+import android.util.Log;
 
 import java.util.HashMap;
 import java.util.Set;
@@ -12,6 +13,8 @@ import java.util.Set;
  * design pattern.
  */
 public class ProtocolRegistry {
+    private static final String TAG = ProtocolRegistry.class.getSimpleName();
+
     // singleton instance
     private static ProtocolRegistry sInstance;
 
@@ -82,9 +85,12 @@ public class ProtocolRegistry {
      */
     public String getSingleToken() {
         if (mProtocolTokenCache.size() != 1) {
-            throw new IllegalStateException(
+            Log.e(TAG, "Ambigous call: there is " + (mProtocolTokenCache.size() > 1 ? "more than one" : "not even one") +
+                " protocol registered");
+            /*throw new IllegalStateException(
                     String.format("Ambigous call: There is %s protocol registered.",
-                            mProtocolTokenCache.size() > 1 ? "more than one" : "not even one"));
+                            mProtocolTokenCache.size() > 1 ? "more than one" : "not even one"));*/
+            return null;
         }
         return (String) mProtocolTokenCache.values().toArray()[0];
     }

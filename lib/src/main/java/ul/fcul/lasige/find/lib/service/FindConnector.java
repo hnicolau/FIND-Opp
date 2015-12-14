@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import ul.fcul.lasige.find.lib.data.FindContract;
+import ul.fcul.lasige.find.lib.data.InternetObserver;
 import ul.fcul.lasige.find.lib.data.NeighborObserver;
 import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.find.lib.data.PacketObserver;
@@ -68,6 +69,9 @@ public class FindConnector implements Handler.Callback {
     // maps protocol names to neighbor observers
     private final Map<String, NeighborObserver> mNeighborObservers = new HashMap<>();
 
+    // internet observer
+    private InternetObserver mInternetObserver = null;
+
     /**
      * Enables access to singleton instance of FindConnector.
      *
@@ -92,7 +96,7 @@ public class FindConnector implements Handler.Callback {
      *
      * @return True if connection was successful, false otherwise.
      */
-    public boolean bind() {
+    public boolean bind(InternetObserver.InternetCallback callback) {
         // establish a connection with the service.
         Intent serviceIntent = new Intent(START_FIND);
         // need to set intent explicit
@@ -103,6 +107,10 @@ public class FindConnector implements Handler.Callback {
         if (mPlatformAvailable) {
             Log.d(TAG, "Successfully bound with the FIND platform");
             mMessenger.setApiKey(TokenStore.getApiKey(mContext));
+            // internet observer
+            mInternetObserver = new InternetObserver(callback);
+            mInternetObserver.register();
+            mMessenger.sendCommand(FindMessenger.MSG_INTERNET_CONNECTION); // request Internet state
         } else {
             Log.d(TAG, "Could not bound with the FIND platform");
             Toast.makeText(mContext, "The FIND platform is currently not installed.", Toast.LENGTH_SHORT).show();
@@ -120,7 +128,11 @@ public class FindConnector implements Handler.Callback {
         if (mPlatformAvailable) {
             Log.d(TAG, "Unbinding from FIND platform ...");
             // unbind from platform
+            mMessenger.sendCommand(FindMessenger.MSG_RELEASE_INTERNET);
             mMessenger.sendCommand(FindMessenger.MSG_UNREGISTER_CLIENT);
+
+            // unregister internet observer
+            mInternetObserver.unregister();
             // unregister packet observers
             for (PacketObserver observer : mPacketObservers.values()) {
                 observer.unregister();
@@ -215,6 +227,7 @@ public class FindConnector implements Handler.Callback {
 
     public void requestStart() {
         if (mPlatformAvailable) {
+            mInternetObserver.register();
             mMessenger.sendCommand(FindMessenger.MSG_START_PLATFORM);
         }
         else {
@@ -224,6 +237,8 @@ public class FindConnector implements Handler.Callback {
 
     public void requestStop() {
         if (mPlatformAvailable) {
+            mInternetObserver.unregister();
+            mMessenger.sendCommand(FindMessenger.MSG_RELEASE_INTERNET);
             mMessenger.sendCommand(FindMessenger.MSG_STOP_PLATFORM);
         }
         else {
@@ -288,7 +303,17 @@ public class FindConnector implements Handler.Callback {
                 }
                 break;
             }
-
+            case FindMessenger.MSG_ACTIVATE_DISCOVERY: {
+                final int active = msg.arg1;
+                Log.d(TAG, "Received state update from FIND platform, platform is " + (active == 1 ? "on" : "off"));
+                // TODO notify client app
+                break;
+            }
+            case FindMessenger.MSG_INTERNET_CONNECTION: {
+                final int connected = msg.arg1;
+                mInternetObserver.onChange(connected == 1 ? true : false);
+                break;
+            }
             default: {
                 // Not one of our messages, let someone else handle it.
                 return false;
@@ -340,6 +365,7 @@ public class FindConnector implements Handler.Callback {
     public void enqueuePacket(byte[] data) {
         if (mPlatformAvailable) {
             final String protocolToken = mProtocolRegistry.getSingleToken();
+            if(protocolToken == null) return;
             enqueuePacket(protocolToken, data);
         }
         else {
@@ -362,6 +388,7 @@ public class FindConnector implements Handler.Callback {
     public void enqueuePacket(byte[] data, byte[] targetNodeId) {
         if (mPlatformAvailable) {
             final String protocolToken = mProtocolRegistry.getSingleToken();
+            if(protocolToken == null) return;
             enqueuePacket(protocolToken, data, targetNodeId);
         }
         else {
@@ -450,7 +477,7 @@ public class FindConnector implements Handler.Callback {
 
     public List<Packet> getOutgoingPackets(String protocolToken) {
         if (mPlatformAvailable) {
-
+            if(protocolToken == null) return new ArrayList<>();
             // get URI for outgoing message
             Uri packetUri = FindContract.buildProtocolUri(FindContract.Packets.URI_OUTGOING, protocolToken);
             // get content resolver
@@ -476,6 +503,25 @@ public class FindConnector implements Handler.Callback {
             list.add(packet);
         }
         return list;
+    }
+
+    public void acquireInternetLock() {
+        if(mPlatformAvailable) {
+            mMessenger.sendCommand(FindMessenger.MSG_ACQUIRE_INTERNET);
+        }
+        else {
+            Log.d(TAG, "FIND platform not available. Make sure it is installed.");
+        }
+    }
+
+    public void releaseInternetLock() {
+        if(mPlatformAvailable) {
+            Log.d(TAG, "sending release message");
+            mMessenger.sendCommand(FindMessenger.MSG_RELEASE_INTERNET);
+        }
+        else {
+            Log.d(TAG, "FIND platform not available. Make sure it is installed.");
+        }
     }
 
 }

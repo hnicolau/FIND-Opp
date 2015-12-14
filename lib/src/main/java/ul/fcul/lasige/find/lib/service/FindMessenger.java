@@ -43,8 +43,14 @@ public class FindMessenger implements ServiceConnection {
     public static final int MSG_START_PLATFORM = 5;
     // used to stop the Supervisor service
     public static final int MSG_STOP_PLATFORM = 6;
-    // used to start the discovering of new neighbors
+    // used to keep the platform on the current network
+    public static final int MSG_ACQUIRE_INTERNET = 7;
+    // used to keep the platform on the current network
+    public static final int MSG_RELEASE_INTERNET = 8;
+    // used to start the discovering of new neighbors and notify client of platform state (on/off)
     public static final int MSG_ACTIVATE_DISCOVERY = 23;
+    // used to notify clients of internet connection
+    public static final int MSG_INTERNET_CONNECTION = 24;
 
     /**
      * Bundle parameters used for communication with FIND service
