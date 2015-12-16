@@ -79,13 +79,12 @@ public class DbController {
 
     public Cursor getApplications() {
         final SQLiteDatabase db = mDbHelper.getReadableDatabase();
-        final Cursor appCursor = db.query(
+
+        return db.query(
                 FullContract.Apps.TABLE_NAME,
                 FullContract.Apps.PROJECTION_DEFAULT,
                 null, null, null, null,
                 FullContract.Apps.SORT_ORDER_DEFAULT);
-
-        return appCursor;
     }
 
     public String insertApplication(String packageName) {
@@ -203,13 +202,12 @@ public class DbController {
 
     public Cursor getImplementations(String whereColumn, String[] whereArgs) {
         final SQLiteDatabase db = mDbHelper.getReadableDatabase();
-        final Cursor implCursor = db.query(
+
+        return db.query(
                 ClientImplementations.VIEW_NAME_FULL_DETAILS,
                 ClientImplementations.PROJECTION_DEFAULT,
                 null, null, null, null,
                 ClientImplementations.SORT_ORDER_DEFAULT);
-
-        return implCursor;
     }
 
     private long insertRawImplementation(long appId, long protocolId, long identityId) {
@@ -225,7 +223,7 @@ public class DbController {
         // see https://code.google.com/p/android/issues/detail?id=13045
         return db.insertWithOnConflict(
                 ClientImplementations.TABLE_NAME, null, values,
-                SQLiteDatabase.CONFLICT_IGNORE); // TODO original was CONFLICT_IGNORE
+                SQLiteDatabase.CONFLICT_IGNORE);
     }
 
     public ClientImplementation insertImplementation(String appToken, Bundle values) {
@@ -408,37 +406,34 @@ public class DbController {
 
     public Cursor getOutgoingPackets() {
         final SQLiteDatabase db = mDbHelper.getReadableDatabase();
-        final Cursor packetCursor = db.query(
+
+        return db.query(
                 Packets.VIEW_NAME_OUTGOING,
                 Packets.PROJECTION_DEFAULT,
                 null, null, null, null,
                 Packets.SORT_ORDER_DEFAULT);
-
-        return packetCursor;
     }
 
     public Cursor getOutgoingPackets(long sinceTimestamp) {
         final SQLiteDatabase db = mDbHelper.getReadableDatabase();
-        final Cursor packetCursor = db.query(
+
+        return db.query(
                 Packets.VIEW_NAME_OUTGOING,
                 Packets.PROJECTION_DEFAULT,
                 String.format(Packets.WHERE_CLAUSE_TIME_RECEIVED, sinceTimestamp),
                 null, null, null,
                 Packets.SORT_ORDER_DEFAULT);
-
-        return packetCursor;
     }
 
     public Cursor getOutgoingPackets(long sinceTimestamp, long untilTimestamp) {
         final SQLiteDatabase db = mDbHelper.getReadableDatabase();
-        final Cursor packetCursor = db.query(
+
+        return db.query(
                 Packets.VIEW_NAME_OUTGOING,
                 Packets.PROJECTION_DEFAULT,
                 String.format(Packets.WHERE_CLAUSE_TIME_RECEIVED_UNTIL, sinceTimestamp, untilTimestamp),
                 null, null, null,
                 Packets.SORT_ORDER_DEFAULT);
-
-        return packetCursor;
     }
 
     public long insertIncomingPacket(TransportPacket packet, PacketQueues[] queues) {
@@ -625,13 +620,11 @@ public class DbController {
     public Cursor getNeighborsCursor(long timeLastSeen) {
         final SQLiteDatabase db = mDbHelper.getReadableDatabase();
 
-        final Cursor neighborsCursor = db.query(
+        return db.query(
                 NeighborProtocols.VIEW_NAME,
                 NeighborProtocols.PROJECTION_DEFAULT,
                 String.format(NeighborProtocols.WHERE_CLAUSE_TIME_SEEN, timeLastSeen),
                 null, null, null, null);
-
-        return neighborsCursor;
     }
 
     public Set<Neighbor> getNeighbors(long timeLastSeen) {
@@ -680,7 +673,7 @@ public class DbController {
         db.beginTransaction();
 
         try {
-            boolean success = false;
+            boolean success;
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                 success = resetRawNeighborTimeLastPacket_postSDK11();
@@ -711,11 +704,10 @@ public class DbController {
     private boolean resetRawNeighborTimeLastPacket_preSDK11() {
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
 
-        final StringBuilder updateQueryString =
-                new StringBuilder("update " + Neighbors.TABLE_NAME + " set ")
-                        .append(Neighbors.COLUMN_TIME_LASTPACKET + " = ").append(0);
+        String updateQueryString = "update " + Neighbors.TABLE_NAME + " set " +
+                Neighbors.COLUMN_TIME_LASTPACKET + " = " + 0;
 
-        db.execSQL(updateQueryString.toString());
+        db.execSQL(updateQueryString);
         return true;
     }
 
@@ -789,7 +781,7 @@ public class DbController {
             final byte[] btAddress = values.getAsByteArray(Neighbors.COLUMN_BLUETOOTH);
             assert (btAddress == null || btAddress.length == 6);
 
-            boolean success = false;
+            boolean success;
             if (neighborRowId <= 0) {
                 // Neighbor has never been seen before -> INSERT
                 neighborRowId = insertRawNeighbor(
@@ -985,15 +977,11 @@ public class DbController {
     private boolean updateRawNeighbor_preSDK11(long neighborRowId, long timeLastPacket) {
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
 
-        final StringBuilder updateQueryString =
-                new StringBuilder("update " + Neighbors.TABLE_NAME + " set ")
-                        .append(Neighbors.COLUMN_TIME_LASTPACKET + " = ")
-                        .append(timeLastPacket);
+        String updateQueryString = "update " + Neighbors.TABLE_NAME + " set " +
+                Neighbors.COLUMN_TIME_LASTPACKET + " = " +
+                timeLastPacket + " where " + Neighbors._ID + " = " + neighborRowId;
 
-        // Add WHERE clause
-        updateQueryString.append(" where " + Neighbors._ID + " = ").append(neighborRowId);
-
-        db.execSQL(updateQueryString.toString());
+        db.execSQL(updateQueryString);
         return true;
     }
 

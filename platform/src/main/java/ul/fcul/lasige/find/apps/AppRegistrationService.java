@@ -16,11 +16,13 @@ import ul.fcul.lasige.find.lib.service.ApiKeyReceiver;
 import ul.fcul.lasige.find.service.FindApp;
 
 /**
- * Created by hugonicolau on 04/11/2015.
  *
- * An {@link IntentService} subclass handling OppNet client application registration requests.
- * <p>
- * TODO: explain message flow
+ * An {@link IntentService} subclass handling FIND client application registration requests.
+ *
+ * <p>Request can arrive from client applications via {@link ul.fcul.lasige.find.lib.service.FindConnector}
+ * or internally from {@link PackageChangeReceiver} when new applications are un/installed.</p>
+ *
+ * Created by hugonicolau on 04/11/2015.
  */
 
 public class AppRegistrationService extends IntentService {

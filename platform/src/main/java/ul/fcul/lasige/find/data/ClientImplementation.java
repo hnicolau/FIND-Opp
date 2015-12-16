@@ -6,10 +6,10 @@ import com.google.common.base.Objects;
 import com.google.common.io.BaseEncoding;
 
 /**
+ *
+ * This class represents the mapping between a client application and a protocol with a unique access token
+ *
  * Created by hugonicolau on 05/11/2015.
- *
- * Simple wrapper around cursor retrieved from querying the client implementation details view.
- *
  */
 
 public class ClientImplementation {
@@ -107,7 +107,7 @@ public class ClientImplementation {
 
     public int getDefaultTtl() {
         Integer ttl = mDefaultTtl;
-        if (ttl == null) {
+        if (ttl == 0) { // original was == null, but that never happens
             ttl = DEFAULT_TTL;
         }
         return ttl;

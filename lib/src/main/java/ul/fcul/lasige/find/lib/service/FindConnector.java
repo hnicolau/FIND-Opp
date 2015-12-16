@@ -111,7 +111,7 @@ public class FindConnector implements Handler.Callback {
             mInternetObserver.register();
             mMessenger.sendCommand(FindMessenger.MSG_INTERNET_CONNECTION); // request Internet status
         } else {
-            Log.d(TAG, "Could not bound with the FIND platform");
+            Log.d(TAG, "Could not bind with the FIND platform");
             Toast.makeText(mContext, "The FIND platform is currently not installed.", Toast.LENGTH_SHORT).show();
             // TODO request installation
         }
