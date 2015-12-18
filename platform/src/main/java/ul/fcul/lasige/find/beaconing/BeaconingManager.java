@@ -5,7 +5,6 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Message;
 import android.os.PowerManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
@@ -14,7 +13,6 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -36,6 +34,11 @@ import ul.fcul.lasige.find.protocolbuffer.FindProtos;
 import ul.fcul.lasige.find.utils.InterruptibleFailsafeRunnable;
 
 /**
+ * BeaconingManager is a Singleton class, thus it should be accessed through {@link BeaconingManager#getInstance(Context)}.
+ *
+ * <p>This class is responsible for managing the state machine of the beaconing stage, which includes
+ * starting/stoping beacon listeners, actively search for neighbors, parse and create beacons, and so forth.</p>
+ *
  * Created by hugonicolau on 12/11/15.
  */
 public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChangeListener {
@@ -47,7 +50,6 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
      * @see #EXTRA_BEACONING_ID
      *
      */
-
     public static final String ACTION_BEACONING_FINISHED = "ul.fcul.lasige.find.action.BEACONING_FINISHED";
 
     /**
@@ -57,6 +59,7 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
      */
     public static final String EXTRA_BEACONING_ID = "beaconing_id";
 
+    // port used to listen for beacons
     protected static final int RECEIVER_PORT_UNICAST = 3108;
     /*protected static final int RECEIVER_PORT_MULTICAST = 5353;
     protected static final InetAddress[] MULTICAST_GROUPS = {
@@ -70,11 +73,14 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     protected static final UUID FIND_UUID = UUID.fromString("35b0a0a8-c92a-4c63-b7d8-d0a55ca18159");
 
     // TODO we're only using multicast at the moment
-    protected static enum SocketType { UNICAST, MULTICAST, RFCOMM };
+    protected enum SocketType { UNICAST, MULTICAST, RFCOMM }
 
     private static final String TAG = BeaconingManager.class.getSimpleName();
+
+    // singleton instance
     private static BeaconingManager sInstance;
 
+    // general variables
     protected final Context mContext;
     protected final PowerManager mPowerManager;
     protected final NetworkManager mNetManager;
@@ -82,24 +88,25 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     protected final ProtocolRegistry mProtocolRegistry;
     protected final Identity mMasterIdentity;
 
+    // packet manager, handles all message (not beacons) communication with neighbors
     protected final PacketCommManager mPacketCommManager;
 
     // beacon processing
     protected ScheduledExecutorService mThreadPool;
-    protected BeaconParser mBeaconParser;
-    protected InterruptibleFailsafeRunnable mBeaconingInterval;
+    protected BeaconParser mBeaconParser; // thread that parses received beacons
+    protected InterruptibleFailsafeRunnable mBeaconingInterval; // this is the main thread that is running when looking for neighbors
 
-    // beacong sending/receiving
-    protected UdpReceiver mUnicastReceiver;
+    // beacon sending/receiving
+    protected UdpReceiver mUnicastReceiver; // beacon receiver
     /*protected UdpReceiver mMulticastReceiver;*/
-    protected WeakReference<UdpSender> mOneTimeWifiSender;
-    protected ScheduledFuture<?> mRegularWifiSender;
+    protected WeakReference<UdpSender> mOneTimeWifiSender; // beacon sender
+    protected ScheduledFuture<?> mRegularWifiSender; // beacon sender
     /*protected RfcommReceiver mBluetoothReceiver;
     protected WeakReference<RfcommSender> mBtSender;
     protected final Map<String, BluetoothSocket> mBluetoothSockets = new HashMap<>();*/
     protected final BeaconBuilder mBeaconBuilder;
 
-    private int mWifiConnectionLockCount;
+    private int mWifiConnectionLockCount; // used to keep network state
     /*private int mBtConnectionLockCount;*/
 
     // beaconing state
@@ -115,18 +122,13 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     // callbacks
     // internet callback
     private Set<InternetCallback> mInternetCallbacks = new HashSet<>();
-    protected Map<String, Integer> mInternetLockCount = new HashMap<String, Integer>();
+    protected Map<String, Integer> mInternetLockCount = new HashMap<>(); // used to keep current internet connection
     protected boolean mHasInternet = false;
-    /*
-     * LIFECYCLE
-     */
-    public static synchronized BeaconingManager getInstance(Context context) {
-        if (sInstance == null) {
-            sInstance = new BeaconingManager(context);
-        }
-        return sInstance;
-    }
 
+    /**
+     * Constructor.
+     * @param context Application context
+     */
     private BeaconingManager(Context context) {
         mContext = context;
 
@@ -140,30 +142,59 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         mHasInternet = mNetManager.hasInternetAccess();
     }
 
+    /**
+     * Retrieves singleton instance of {@link BeaconingManager}.
+     * @param context Application context.
+     * @return A {@link BeaconingManager} object.
+     */
+    public static synchronized BeaconingManager getInstance(Context context) {
+        if (sInstance == null) {
+            sInstance = new BeaconingManager(context);
+        }
+        return sInstance;
+    }
+
     /*
      * INTERNET CALLBACK
      */
-    public static interface InternetCallback { public void onInternetConnection(boolean connected); }
+    public interface InternetCallback { void onInternetConnection(boolean connected); }
 
+    /**
+     * Adds a callback that will be trigger on Internet connectivity changes.
+     * @param internetCallback Callback.
+     */
     public void addInternetCallback(InternetCallback internetCallback) {
         Log.d(TAG, "Internet callback added");
         mInternetCallbacks.add(internetCallback);
     }
 
+    /**
+     * Remove previsously added callback.
+     * @param internetCallback Callback.
+     */
     public void removeInternetCallback(InternetCallback internetCallback) { mInternetCallbacks.remove(internetCallback); }
 
+    /**
+     * Notifies all Internet callbacks.
+     * @param connected Connectivity status.
+     */
     private void notifyInternetCallbacks(boolean connected) {
-        Log.d(TAG, "Going to notify " + connected);
         for (InternetCallback callback : mInternetCallbacks) {
             callback.onInternetConnection(connected);
         }
     }
 
+    /**
+     * Notifies all Internet callbacks with current Internet connectivity status.
+     */
     public void notifyInternetCallbacks() {
-        Log.d(TAG, "Going to check internet");
         notifyInternetCallbacks(hasInternetAccess());
     }
 
+    /**
+     * Returns Internet connectivity status.
+     * @return true if there the Internet is currently accessible, false otherwise.
+     */
     public boolean hasInternetAccess() {
         mHasInternet = mNetManager.hasInternetAccess();
         return mHasInternet;
@@ -172,31 +203,58 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     /*
      * BEACONING STATE
      */
+
+    /**
+     * Transitions to the new {@link BeaconingState}. If the new and current state are the same, then
+     * there is no transition. An {@link IllegalStateException} is thrown if the new state can't be
+     * reached from the current state.
+     * @param newState New {@link BeaconingState}.
+     * @see BeaconingState
+     */
     private synchronized void doStateTransition(final BeaconingState newState) {
         if (newState.equals(mState)) {
-            // The beaconing manager is already in the target state.
+            // the beaconing manager is already in the target state.
             return;
         } else if (!newState.isPossibleOrigin(mState)) {
-            // The transition is not possible
+            // the transition is not possible
             throw new IllegalStateException("Can not transition from " + mState + " to " + newState);
         }
 
-        // Perform state transition and execute main body of new state
+        // perform state transition and execute main body of new state
         Log.v(TAG, "Transitioning from " + mState + " to " + newState);
+
+        // leave current state
         mState.onLeave(this);
+
+        // update current state
         mState = newState;
+
+        // enter new state
         newState.onEnter(this);
+
+        // execute new state
         newState.execute(this);
 
+        // notify neighbor content resolvers
         notifyNeighborUris(mContext);
     }
 
+    /**
+     * Creates thread pool.
+     * @see Thread
+     * @see ScheduledExecutorService
+     */
     private void setupThreadPool() {
         if (mThreadPool == null) {
             mThreadPool = Executors.newScheduledThreadPool(10);
         }
     }
 
+    /**
+     * Destroys thread pool and stops beacon senders/receivers
+     * @see Thread
+     * @see ScheduledExecutorService
+     */
     private void teardownThreadPool() {
         stopBeaconSenders();
         stopBeaconReceivers();
@@ -207,6 +265,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         Log.v(TAG, "Thread pool shut down");
     }
 
+    /**
+     * Creates policy broadcast receiver in case it isn't already created and initializes current policy.
+     */
     private void setupPolicyReceiver() {
         if (mPolicyChangedReceiver == null) {
             mPolicyChangedReceiver = new BroadcastReceiver() {
@@ -221,6 +282,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         }
     }
 
+    /**
+     * Destroys policy broadcast receiver
+     */
     private void teardownPolicyReceiver() {
         if (mPolicyChangedReceiver != null) {
             Policy.unregisterPolicyChangedReceiver(mContext, mPolicyChangedReceiver);
@@ -233,10 +297,20 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     /*
      * BEACON RECEIVERS
      */
+    /**
+     * Activate beacon receivers. This operation is not synchronous; only after connecting to a neighbor
+     * or network, beacons receiver will start.
+     *
+     * <p>This method creates a network save point and acquires a lock. It also starts the {@link BeaconParser} thread
+     * (to handle received beacons) and the {@link PacketCommManager} (to send packets to neighbors).</p>
+     */
     private void activateBeaconReceivers() {
+        // create save point
         mNetManager.createSavepoint();
+        // acquire lock
         mNetManager.acquireLocks();
 
+        // start beacon parser thread to handle received beacons
         mBeaconParser = new BeaconParser(this);
         mThreadPool.execute(mBeaconParser);
 
@@ -248,25 +322,43 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
             startBluetoothReceiver();
         }*/
 
+        // start packet manager to handle packet communications with neighbors
         mPacketCommManager.start();
     }
 
+    /**
+     * Deactivate beacons receivers. This is a synchronous operation.
+     *
+     * <p>In addition to stop beacon receivers, it stops the {@link PacketCommManager}, the {@link BeaconParser} thread,
+     * release connection lock and rolls back to original network state (if possible).</p>
+     */
     private void deactivateBeaconReceivers() {
+        // stop packet communication
         mPacketCommManager.stop();
+        // we are no longer interested in knowing whether there is a new connection
         mNetManager.unregisterForConnectivityChanges(this);
+        // stop beacon receivers
         stopBeaconReceivers();
+        // stop beacon parser thread
         mBeaconParser.interrupt();
+        // release locks
         mNetManager.releaseLocks();
+        // rollback to previous network state if possible
         mNetManager.rollback();
     }
 
+    /**
+     * Start WiFi beacon receiver.
+     */
     protected void startWifiReceiver() {
         try {
+            // start unicast receiver
             if (mUnicastReceiver == null) {
                 mUnicastReceiver = new UdpReceiver.UdpUnicastReceiver(this);
                 mThreadPool.execute(mUnicastReceiver);
             }
 
+            // start multicast receiver
             /*TODO if (mNetManager.getWifiState().equals(NetworkManager.WifiState.STA_ON_PUBLIC_AP)) {
                 // Multicast is only supported on public networks
                  if (mMulticastReceiver == null) {
@@ -279,17 +371,26 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         }
     }
 
+    /**
+     * Stop WiFi beacon receiver.
+     */
     protected void stopWifiReceiver() {
+        // stop unicast receiver
         if (mUnicastReceiver != null) {
             mUnicastReceiver.interrupt();
             mUnicastReceiver = null;
         }
+
+        // stop multicast receiver
         /*TODO if (mMulticastReceiver != null) {
             mMulticastReceiver.interrupt();
             mMulticastReceiver = null;
         }*/
     }
 
+    /**
+     * Start Bluetooth receiver.
+     */
     protected void startBluetoothReceiver() {
         /*try {
             if (mBluetoothReceiver == null) {
@@ -301,6 +402,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         }*/
     }
 
+    /**
+     * Stop Bluetooth receiver.
+     */
     protected void stopBluetoothReceiver() {
         /*TODO if (mBluetoothReceiver != null) {
             mBluetoothReceiver.interrupt();
@@ -309,6 +413,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         interruptBluetoothConnections();*/
     }
 
+    /**
+     * Interrups all Bluetooth connections by trying to close open sockets.
+     */
     private void interruptBluetoothConnections() {
         /*TODO for (BluetoothSocket btSocket : mBluetoothSockets.values()) {
             try {
@@ -321,6 +428,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         mBluetoothSockets.clear();*/
     }
 
+    /**
+     * Stop all beacon receivers.
+     */
     protected void stopBeaconReceivers() {
         stopWifiReceiver();
         //TODO stopBluetoothReceiver();
@@ -328,6 +438,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
 
     // BEACON SENDERS
 
+    /**
+     * Attemps to send a single beacon if there is a connection.
+     */
     public void sendSingleBeacon() {
         if (mNetManager.isWifiConnected()) {
             startWifiSender(false);
@@ -337,6 +450,10 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         }*/
     }
 
+    /**
+     * Starts sending beacon(s). At least it sends one beacon to neighbors.
+     * @param repeating If true, it sends burst of 3 beacons in intervals of 3 seconds.
+     */
     protected void startWifiSender(boolean repeating) {
         if (mRegularWifiSender != null && !mRegularWifiSender.isDone()) {
             // The senders are already running
@@ -347,23 +464,29 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         mCurrentApLikelihood = 0;
         if (mNetManager.getWifiState().equals(NetworkManager.WifiState.FIND_AP)
                 && mPolicy.allows(Policy.Feature.WIFI_AP)) {
-            // Signal willingness to take over AP mode
+            // signal willingness to take over AP mode
             mCurrentApLikelihood = (int) (Math.random() * 256);
         }
         mIsDesignatedAp = (mCurrentApLikelihood > 0);
 
+        // start udp sender for a single beacon
         UdpSender oneTimeWifiSender = new UdpSender(this, true, 1, mCurrentApLikelihood);
-        mOneTimeWifiSender = new WeakReference<UdpSender>(oneTimeWifiSender);
+        mOneTimeWifiSender = new WeakReference<>(oneTimeWifiSender);
         mThreadPool.execute(oneTimeWifiSender);
 
         if (repeating) {
+            // send bursts of 3 beacons every 3 seconds
             UdpSender repeatingWifiSender = new UdpSender(this, false, 3, mCurrentApLikelihood);
             mRegularWifiSender =
                     mThreadPool.scheduleAtFixedRate(repeatingWifiSender, 2, 3, TimeUnit.SECONDS);
         }
     }
 
+    /**
+     * Stop all WiFi beacon senders.
+     */
     protected void stopWifiSender() {
+        // stop single beacon sender
         if (mOneTimeWifiSender != null) {
             UdpSender oneTimeSender = mOneTimeWifiSender.get();
             if (oneTimeSender != null) {
@@ -372,6 +495,7 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
             }
         }
 
+        // stop repeating beacon sender
         if (mRegularWifiSender != null) {
             mRegularWifiSender.cancel(true);
             mRegularWifiSender = null;
@@ -396,6 +520,10 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         }
     }
 */
+
+    /**
+     * Stop all beacon senders.
+     */
     protected void stopBeaconSenders() {
         stopWifiSender();
         //TODO stopBluetoothSender();
@@ -404,39 +532,66 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     /*
      * BEACONING INTERVAL
      */
+    /**
+     * Start {@link BeaconingIntervalHandler} thread. This is where the platform attempts to connect
+     * to nearby neighbors.
+     */
     private void startBeaconingInterval() {
         if (mBeaconingInterval == null) {
+            // delete all previous processed beacons
             mBeaconParser.clearProcessedBeacons();
+            // start thread
             mBeaconingInterval = new BeaconingIntervalHandler(this, mCurrentBeaconingRoundId);
             new Thread(mBeaconingInterval).start();
         }
     }
 
+    /**
+     * Stop {@link BeaconingIntervalHandler} thread.
+     */
     private void stopBeaconingInterval() {
+        // stop thread
         if (mBeaconingInterval != null) {
             mBeaconingInterval.interrupt();
             mBeaconingInterval = null;
 
+            // because we are no longer listening for connectivity changes in the BeaconingIntervalHandler
+            // we need to listen for them here.
             mNetManager.registerForConnectivityChanges(this);
         }
     }
 
     /*
-     * CALLBACKS
+     * CALLBACKS FROM RECEIVERS AND PARSERS
      */
-    // called by UdpReceiver
+
+    /**
+     * Callback being called by {@link UdpReceiver} when a new beacon is received from a neighbor.
+     * @param possibleBeacon Received beacon.
+     */
     protected void onBeaconReceived(BeaconParser.PossibleBeacon possibleBeacon) {
         mBeaconParser.addProcessableBeacon(possibleBeacon);
     }
 
-    // called by BeaconParser
-    protected void onBeaconParsed(FindProtos.Beacon beacon, BeaconParser.PossibleBeacon rawData, long timeReceived) {
+    /**
+     * Callback being called by {@link BeaconParser} when it finishes parsing a beacon.
+     *
+     * <p>This method replies to the neighbor with the platform's protocols and updates the likelihood
+     * of taking over as an AP based on neighbor's likelihood.</p>
+     * @param beacon Received beacon.
+     * @param rawData Data from beacon.
+     * @param timeCreated Timestamp the beacon was originally created
+     */
+    protected void onBeaconParsed(FindProtos.Beacon beacon, BeaconParser.PossibleBeacon rawData, long timeCreated) {
+        // if we are currently listening for beacons and this is not a reply beacon
         if (mState == BeaconingState.PASSIVE && beacon.getBeaconType() == FindProtos.Beacon.BeaconType.ORIGINAL) {
+            // get neighbor
             final byte[] origin = rawData.getOrigin();
             if (origin.length != 6) {
-                // Reply to IPv4/IPv6 beacons (bluetooth beacons are always answered directly)
+                // reply to IPv4/IPv6 beacons (bluetooth beacons are always answered directly)
                 try {
                     final InetAddress replyTo = InetAddress.getByAddress(origin);
+                    // send likelihood of we becoming an AP along with our protocols and so forth.
                     UdpSender replySender = new UdpSender(this, replyTo, beacon, mCurrentApLikelihood);
                     mThreadPool.execute(replySender);
                 } catch (UnknownHostException e) {
@@ -445,8 +600,12 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
             }
         }
 
+        // if we are an AP, see how likely it is for the neighbor to take over
         if (mNetManager.getWifiState().equals(NetworkManager.WifiState.STA_ON_FIND_AP)) {
+            // get neighbor's AP likelihood
             final int remoteApLikelihood = beacon.getSender().getApLikelihood() & 0xFF;
+            // update our likelihood if we are more likely to take over
+            // this will be used by the BeaconingIntervalHandler
             mIsDesignatedAp = mIsDesignatedAp
                     && (mCurrentApLikelihood > 0)
                     && (mCurrentApLikelihood >= remoteApLikelihood);
@@ -459,6 +618,15 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         mBluetoothSockets.remove(btDevice.getAddress());
     }
 */
+
+    /**
+     * Callback being called by {@link BeaconingIntervalHandler} when finishes all beaconing rounds.
+     *
+     * <p>This method transition to {@link BeaconingState#PASSIVE PASSIVE} state and notifies the
+     * platform (e.g. {@link ul.fcul.lasige.find.service.SupervisorService Supervisor}
+     * that the beaconing round finished.</p>
+     * @param beaconingId Beaconing round id.
+     */
     public void onBeaconingIntervalFinished(int beaconingId) {
         doStateTransition(BeaconingState.PASSIVE);
 
@@ -488,42 +656,66 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
 */
 
     /*
-     * INTERNET STATE LOCK
+     * INTERNET STATE LOCK - used by client applications
+     */
+    /**
+     * Acquire Internet lock to force platform to stay in current network.
+     * @param appName Client application requesting the lock.
      */
     public synchronized void acquireInternetLock(String appName) {
-        Log.d(TAG, "acquiring lock : " + appName);
         mInternetLockCount.put(appName, mInternetLockCount.size());
     }
 
+    /**
+     * Release Internet lock. Platform can now search other networks/neighbors.
+     * @param appName Client application requesting the release.
+     */
     public synchronized void releaseInternetLock(String appName) {
-        Log.d(TAG, "releasing lock " + appName);
         mInternetLockCount.remove(appName);
     }
 
+    /**
+     * Resets Internet locks, i.e. releases all locks.
+     */
     public synchronized void resetInternetLock() {
-        Log.d(TAG, "reset Internet lock!");
         mInternetLockCount = new HashMap<>();
     }
 
+    /**
+     * Retrieves whether there is a current Internet lock.
+     * @return true if there is (at least) a lock, false otherwise.
+     */
     public boolean isInternetLocked() {
         return !mInternetLockCount.isEmpty();
     }
 
-    /*
-     * CONNECTION LOCKS
-     */
 
+    /*
+     * CONNECTION LOCKS - used by the platform
+     */
+    /**
+     * Releases all WiFi connection locks and rollback to initial WiFi state.
+     */
     public synchronized void resetWifiConnectionLock() {
         mWifiConnectionLockCount = 0;
         rollbackNetworkStateIfSuitable();
     }
 
+    /**
+     * Locks/releases WiFi connection. The method attempts to rollback to initial WiFi state.
+     * @param locked true to lock, false to release.
+     * @see BeaconingManager#rollbackNetworkStateIfSuitable()
+     */
     public synchronized void setWifiConnectionLocked(boolean locked) {
         final int modifier = (locked ? 1 : -1);
         mWifiConnectionLockCount = Math.max(0, mWifiConnectionLockCount + modifier);
         rollbackNetworkStateIfSuitable();
     }
 
+    /**
+     * Returns whether there are active WiFi locks.
+     * @return true if there are active locks, false otherwise.
+     */
     public boolean isWifiConnectionLocked() {
         return mWifiConnectionLockCount > 0;
     }
@@ -543,6 +735,13 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         return mBtConnectionLockCount > 0;
     }*/
 
+    /**
+     * Rollback network state if there are no current WiFi locks. It only rollback when {@link BeaconingManager}
+     * is either on {@link BeaconingState#PASSIVE PASSIVE} or {@link BeaconingState#STOPPED STOPPED} state.
+     * <p>Rollback consists in recovering the previously saved network state.</p>
+     * @see NetworkManager#createSavepoint()
+     * @see NetworkManager#rollback()
+     */
     private void rollbackNetworkStateIfSuitable() {
         if (mWifiConnectionLockCount /*TODO + mBtConnectionLockCount*/ == 0) {
             // Locks are now completely released
@@ -555,28 +754,49 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     }
 
     /*
-     * NETWORK CHANGE LISTENERS
+     * NETWORK CHANGE LISTENERS - called by NetworkManager
      */
-
+    /**
+     * Callback for WiFi adapter changes. Empty by default.
+     * @param enabled Indicates if adapter is enabled.
+     */
     @Override
     public void onWifiAdapterChanged(boolean enabled) { }
 
+    /**
+     * Callback for WiFi network chages.
+     *
+     * <p>Notifies Internet callbacks.</p>
+     *
+     * <p>If {@link BeaconingManager} is on {@link BeaconingState#PASSIVE PASSIVE} state, then it
+     * starts or stops WiFi receivers/senders based on connectivity. If connected, starts WiFi receivers
+     * and senders. If disconnected, stops WiFi receivers and senders.</p>
+     * @param connected Indicates whether there is a connection.
+     * @param isFailover Indicates if it is a failover callback.
+     */
     @Override
     public void onWifiNetworkChanged(boolean connected, boolean isFailover) {
         // check Internet connection and notify observers
         notifyInternetCallbacks();
 
+        // if we are in active state, do not mess with senders/receivers
         if (mState == BeaconingState.PASSIVE) {
             if (connected) {
+                // start
                 startWifiReceiver();
                 startWifiSender(false);
             } else {
+                // stop
                 stopWifiSender();
                 stopWifiReceiver();
             }
         }
     }
 
+    /**
+     * Callback for Bluetooth adapter changes. Empty by default.
+     * @param enabled Indicates whether the adapter is enabled.
+     */
     @Override
     public void onBluetoothAdapterChanged(boolean enabled) {
         /*TODO if (mState == BeaconingState.PASSIVE) {
@@ -590,6 +810,12 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         }*/
     }
 
+    /**
+     * Callback for Access Point (AP) changes.
+     *
+     * <p>Notifies Internet callbacks.</p>
+     * @param activated Indicates whether the AP is activated.
+     */
     @Override
     public void onAccessPointModeChanged(boolean activated) {
         // check Internet connection and notify observers
@@ -599,28 +825,43 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     /*
      * EXTERNAL API
      */
+    /**
+     * Returns whether the {@link BeaconingManager} is in an active state; that is, different from
+     * {@link BeaconingState#STOPPED STOPPED}.
+     * @return whether current {@link BeaconingState} is different from {@link BeaconingState#STOPPED STOPPED} state.
+     */
     public boolean isActivated() {
         return (mState != BeaconingState.STOPPED);
     }
 
+    /**
+     * Set current {@link BeaconingState} to {@link BeaconingState#STOPPED STOPPED}.
+     */
     public void setStopped() {
         doStateTransition(BeaconingState.STOPPED);
     }
 
+    /**
+     * Set current {@link BeaconingState} to {@link BeaconingState#PASSIVE PASSIVE}.
+     */
     public void setPassive() {
         doStateTransition(BeaconingState.PASSIVE);
     }
 
+    /**
+     * Set current {@link BeaconingState} to {@link BeaconingState#ACTIVE ACTIVE}.
+     * @param beaconingRoundId Current beaconing round id.
+     */
     public void setActive(int beaconingRoundId) {
         mCurrentBeaconingRoundId = beaconingRoundId;
         doStateTransition(BeaconingState.ACTIVE);
     }
 
     /**
-     *
-     *
+     * {@link BeaconingManager} state representation: {@link BeaconingState#STOPPED}, {@link BeaconingState#PASSIVE},
+     * {@link BeaconingState#ACTIVE}
      */
-    public static enum BeaconingState {
+    public enum BeaconingState {
         /**
          * The beaconing manager is stopped (not instantiated).
          */
@@ -675,21 +916,21 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
         /**
          * Executes when entering this state. By default, this method does nothing.
          *
-         * @param bm
+         * @param bm BeaconingManager object
          */
         public void onEnter(BeaconingManager bm) { }
 
         /**
          * Executes the main function of this state. By default, this method does nothing.
          *
-         * @param bm
+         * @param bm BeaconingManager object
          */
         public void execute(BeaconingManager bm) { }
 
         /**
          * Executes when leaving this state. By default, this method does nothing.
          *
-         * @param bm
+         * @param bm BeaconingManager object
          */
         public void onLeave(BeaconingManager bm) { }
 
@@ -706,19 +947,42 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     }
 
     /*
-     * CONTENT NOTIFIER
+     * External API
+     */
+    /**
+     * Current beaconing interval.
+     * @see ul.fcul.lasige.find.beaconing.Policy.BeaconingInterval
      */
     private static Policy.BeaconingInterval sCurrentBeaconingInterval = Policy.BeaconingInterval.OFF;
 
+    /**
+     * Timestamp to query currently connected neighbors. The interval is calculated on the highest value
+     * between the policy's beaconing interval (2 times this value) and 20 minutes.
+     *
+     * <p>This method has implications on how often neighbors are considered disconnected. Just because we
+     * did not see a certain neighbor in the last couple of beaconing rounds, does not means it is not reachable.
+     * Only when a neighbor isn't seen for more than the calculated time interval, then it is considered disconnected
+     * (no longer reachable)</p>
+     * @return Timestamp of past 20 minutes or 2 times the beaconing interval (whichever is higher).
+     */
     public static long getCurrentTimestamp() {
         final int periodMillis = Math.max(2 * sCurrentBeaconingInterval.getIntervalMillis(), 20 * 60 * 1000); // last 20 minutes (max)
         return (System.currentTimeMillis() - periodMillis) / 1000;
     }
 
+    /**
+     * Timestamp to query recently connected neighbors.
+     * @return Timestamp of past 24 hours.
+     */
     public static long getRecentTimestamp() {
         return (System.currentTimeMillis() / 1000) - (24 * 60 * 60); // last 24 hours
     }
 
+    /**
+     * Notify all {@link ul.fcul.lasige.find.data.FullContract.Neighbors} and
+     * {@link ul.fcul.lasige.find.data.FullContract.NeighborProtocols} content resolvers.
+     * @param context Application context.
+     */
     private void notifyNeighborUris(Context context) {
         final Uri[] neighborUris = new Uri[] {
                 FullContract.Neighbors.URI_ALL,

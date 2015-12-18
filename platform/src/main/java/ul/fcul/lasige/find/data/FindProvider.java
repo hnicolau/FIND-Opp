@@ -23,19 +23,35 @@ import ul.fcul.lasige.find.packetcomm.PacketRegistry;
 import java.util.Locale;
 
 /**
+ * Content provider of FIND platform. Extends {@link ContentProvider}.
+ *
  * Created by hugonicolau on 05/11/2015.
  */
 public class FindProvider extends ContentProvider {
     private static final String TAG = FindProvider.class.getSimpleName();
 
+    // database controller
     private DbController mDbController;
+    // database helps
     private static DbHelper sDbHelper;
 
     /**
-     * All URI paths which can be handled by the content provider.
+     * All URI paths which can be handled by the content provider:
+     * <p>- {@link UriMatch#NO_MATCH},</p>
+     * <p>- {@link UriMatch#IDENTITY_LIST}, {@link UriMatch#IDENTITY_ID},</p>
+     * <p>- {@link UriMatch#APP_LIST}, {@link UriMatch#APP_ID},</p>
+     * <p>- {@link UriMatch#PROTOCOL_LIST}, {@link UriMatch#PROTOCOL_ID},</p>
+     * <p>- {@link UriMatch#IMPLEMENTATION_LIST}, {@link UriMatch#IMPLEMENTATION_ID},</p>
+     * <p>- {@link UriMatch#NEIGHBOR_LIST}, {@link UriMatch#NEIGHBOR_LIST_CURRENT},
+     * {@link UriMatch#NEIGHBOR_LIST_RECENT}, {@link UriMatch#NEIGHBOR_ID},</p>
+     * <p>- {@link UriMatch#NEIGHBOR_PROTOCOLS_LIST}, {@link UriMatch#NEIGHBOR_PROTOCOLS_LIST_CURRENT},
+     * {@link UriMatch#NEIGHBOR_PROTOCOLS_LIST_RECENT}, {@link UriMatch#NEIGHBOR_PROTOCOLS_ID},</p>
+     * <p>- {@link UriMatch#PROTOCOL_NEIGHBORS}</p>
+     * <p>- {@link UriMatch#PACKET_LIST}, {@link UriMatch#PACKET_LIST_INCOMING}, {@link UriMatch#PACKET_LIST_OUTGOING},
+     * {@link UriMatch#PACKET_ID}</p>.
+     *
      */
-
-    private static enum UriMatch {
+    private enum UriMatch {
         NO_MATCH,
 
         IDENTITY_LIST(Identities.URI_ALL, Identities.CONTENT_DIR_TYPE),
@@ -71,37 +87,52 @@ public class FindProvider extends ContentProvider {
         private final String mMatchedPath;
         private final String mContentType;
 
-        private UriMatch() {
+        UriMatch() {
             mUri = null;
             mMatchedPath = null;
             mContentType = null;
         }
 
-        private UriMatch(Uri uri, String contentType) {
+        UriMatch(Uri uri, String contentType) {
             mUri = uri;
             mMatchedPath = TextUtils.join("/", uri.getPathSegments());
             mContentType = contentType;
         }
 
-        private UriMatch(Uri uri, String suffix, String contentType) {
+        UriMatch(Uri uri, String suffix, String contentType) {
             mUri = uri;
             mMatchedPath = TextUtils.join("/", uri.getPathSegments()) + suffix;
             mContentType = contentType;
         }
 
+        /**
+         * Returns {@link Uri}.
+         * @return An {@link Uri} object.
+         */
         public Uri getUri() {
             return mUri;
         }
 
+        /**
+         * Returns Uri path joined by '/' characters.
+         * @return Uri path.
+         */
         public String getMatchedPath() {
             return mMatchedPath;
         }
 
+        /**
+         * Return the content type.
+         * @return The content type.
+         */
         public String getContentType() {
             return mContentType;
         }
     }
 
+    /**
+     * URI Matcher
+     */
     public static final UriMatcher sUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
     static {
         for (UriMatch match : UriMatch.values()) {
@@ -111,24 +142,37 @@ public class FindProvider extends ContentProvider {
 
     @Override
     public boolean onCreate() {
+        // create database controller
         mDbController = new DbController(getContext());
+        // get database helper
         sDbHelper = DbHelper.getInstance(getContext());
         return true;
     }
 
+    /**
+     * Returns the {@link UriMatch} from existing Uri paths that can be handled by FIND's content provided.
+     * @param uri Required Uri
+     * @return {@link UriMatch} for a given Uri. If no match is found, it returns {@link UriMatch#NO_MATCH NO_MATCH}.
+     * @see Uri
+     * @see UriMatch
+     */
     private UriMatch getSafeUriMatch(Uri uri) {
         int match_ = sUriMatcher.match(uri);
         int match = Math.max(0, match_);
         return UriMatch.values()[match];
     }
 
+    /**
+     * Retrieves {@link ClientImplementation} from an {@link Uri}.
+     * @param uri Uri
+     * @return A {@link ClientImplementation} object if uri has a protocol token, null if uri has no token,
+     * and {@link SecurityException} if the token is not valid.
+     */
     private ClientImplementation resolveImplementationDetails(Uri uri) {
         String accessToken = uri.getQueryParameter(FullContract.ACCESS_TOKEN_PARAMETER_NAME);
         if (accessToken == null) {
             Log.v(TAG, "No access token in URI");
             return null;
-            // throw new SecurityException(
-            // "Required access token not found in URI " + uri);
         }
 
         ClientImplementation implementation = mDbController.getImplementation(accessToken);
@@ -139,14 +183,36 @@ public class FindProvider extends ContentProvider {
         return implementation;
     }
 
+    /**
+     * Returns content type.
+     * @param uri Uri
+     * @return Content type of uri.
+     * @see Uri
+     */
     @Override
     public String getType(Uri uri) {
         UriMatch match = getSafeUriMatch(uri);
         return match.getContentType();
     }
 
-    /*
-     * Query
+    /**
+     * Query the given uri, returning a cursor over the result set.
+     * @param uri The uri for the content to retrieve.
+     * @param projection A string array of which columns to return. Passing null will return the default
+     *                   projection for the given uri.
+     * @param selection A filter declaring which rows to return, formatted as an SQL WHERE clause
+     *                  (excluding the WHERE itself). Passing null will return all rows for the given uri.
+     * @param selectionArgs You may include ?s in the selection parameter, which will be replaced by the values
+     *                      selectionArgs, in the order that they appear in the selection. The values will
+     *                      be bound as Strings.
+     * @param sortOrder How to order the rows, formatted as an SQL ORDER BY (excluding the ORDER BY itself).
+     *                  Passing null will use the default sort order for the given uri. For some uri's the
+     *                  sort order can't be changed.
+     * @return A data cursor object, which is positioned before the first entry, or null.
+     *
+     * @see FullContract
+     * @see ul.fcul.lasige.find.lib.data.FindContract
+     * @see Cursor
      */
     @SuppressLint("NewApi")
     @Override
@@ -159,7 +225,7 @@ public class FindProvider extends ContentProvider {
         }
 
         SQLiteDatabase db = sDbHelper.getReadableDatabase();
-        String table = null;
+        String table;
         String where = null;
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
 
@@ -323,8 +389,15 @@ public class FindProvider extends ContentProvider {
         return result;
     }
 
-    /*
-     * Insert
+    /**
+     * Inserts a row into a table at the given uri. If the FIND content provider supports transactions
+     * the insertion will be atomic, otherwise it will return null.
+     * @param uri The uri of the table to insert into.
+     * @param values The initial values for the newly inserted row.
+     * @return The uri of the newly created row, or null if the uri is not supported.
+     * @see Uri
+     * @see FullContract
+     * @see ul.fcul.lasige.find.lib.data.FindContract
      */
     @Override
     public Uri insert(Uri uri, ContentValues values) {
@@ -356,17 +429,31 @@ public class FindProvider extends ContentProvider {
     }
 
     /**
-     * Updates
+     * Update. As of the moment, no updates are allowed by the FIND provider.
+     * @param uri The uri to modify.
+     * @param values The new field values.
+     * @param selection A filter to apply to rows before updating, formatted as an SQL WHERE (excluding
+     *                  the WHERE itself).
+     * @param selectionArgs You may include ?s in the selection parameter, which will be replaced by the values
+     *                      selectionArgs, in the order that they appear in the selection. The values will
+     *                      be bound as Strings.
+     * @return The number of rows updated.
      */
     @Override
-    public int update(Uri uri, ContentValues values, String selection,
-                      String[] selectionArgs) {
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         // No updates allowed
         return 0;
     }
 
     /**
-     * Delete
+     * Delete. As of the moment, no deletes are allowed by the FIND provider.
+     * @param uri The uri to delete from.
+     * @param selection A filter to apply to rows before updating, formatted as an SQL WHERE (excluding
+     *                  the WHERE itself).
+     * @param selectionArgs You may include ?s in the selection parameter, which will be replaced by the values
+     *                      selectionArgs, in the order that they appear in the selection. The values will
+     *                      be bound as Strings.
+     * @return The number of rows deleted.
      */
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
@@ -374,6 +461,11 @@ public class FindProvider extends ContentProvider {
         return 0;
     }
 
+    /**
+     * Retrieves the FIND's platform content provider.
+     * @param context Application context.
+     * @return {@link FindProvider} object.
+     */
     public static FindProvider getLocalContentProvider(Context context) {
         final ContentProviderClient client =
                 context.getContentResolver().acquireContentProviderClient(FullContract.AUTHORITY);

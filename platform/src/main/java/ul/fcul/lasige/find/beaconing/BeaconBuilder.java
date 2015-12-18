@@ -16,6 +16,8 @@ import ul.fcul.lasige.find.network.WifiConnection;
 import ul.fcul.lasige.find.protocolbuffer.FindProtos;
 
 /**
+ * The class provides the functionality to build beacons.
+ *
  * Created by hugonicolau on 13/11/15.
  */
 public class BeaconBuilder {
@@ -32,11 +34,11 @@ public class BeaconBuilder {
     /**
      * Builds a beacon without neighbor information, but with "access point likelihood" value.
      *
-     * @param wifiState
-     * @param connection
-     * @param protocols
-     * @param apLikelihood
-     * @return
+     * @param wifiState WiFi state.
+     * @param connection Connection.
+     * @param protocols Protocol's hash values.
+     * @param apLikelihood AP likelihood.
+     * @return Beacon.
      */
     public byte[] buildBeacon(NetworkManager.WifiState wifiState, Optional<WifiConnection> connection,
                               Set<ByteBuffer> protocols, byte apLikelihood) {
@@ -48,11 +50,11 @@ public class BeaconBuilder {
     /**
      * Builds a beacon with neighbor information, but without "access point likelihood" value.
      *
-     * @param wifiState
-     * @param connection
-     * @param protocols
-     * @param neighbors
-     * @return
+     * @param wifiState WiFi state.
+     * @param connection Connection.
+     * @param protocols Protocols' hash values.
+     * @param neighbors Neighbors
+     * @return Beacon.
      */
     public byte[] buildBeacon(NetworkManager.WifiState wifiState, Optional<WifiConnection> connection,
                               Set<ByteBuffer> protocols, Set<Neighbor> neighbors) {
@@ -61,6 +63,16 @@ public class BeaconBuilder {
                 .build().toByteArray();
     }
 
+    /**
+     * Builds a reply beacon with information about protocols, neighbors, and original beacon.
+     *
+     * @param wifiState WiFi state.
+     * @param connection Connection.
+     * @param protocols Protocols' hash values.
+     * @param neighbors Neighbors.
+     * @param originalBeacon Original beacon.
+     * @return Reply beacon.
+     */
     public byte[] buildReply(NetworkManager.WifiState wifiState, Optional<WifiConnection> connection,
                              Set<ByteBuffer> protocols, Set<Neighbor> neighbors, FindProtos.Beacon originalBeacon) {
 
@@ -70,14 +82,14 @@ public class BeaconBuilder {
     }
 
     /**
-     * Builds a beacon.
+     * Builds a beacon. Used internally.
      *
-     * @param wifiState
-     * @param wifiConnection
-     * @param protocols
-     * @param neighbors
-     * @param apLikelihood
-     * @return
+     * @param wifiState WiFi state.
+     * @param wifiConnection Connection.
+     * @param protocols Protocols' hash values.
+     * @param neighbors Neighbors.
+     * @param apLikelihood AP likelihood.
+     * @return Beacon.
      */
     private FindProtos.Beacon.Builder makeBeacon(NetworkManager.WifiState wifiState, Optional<WifiConnection> wifiConnection,
                                       Set<ByteBuffer> protocols, Set<Neighbor> neighbors, Byte apLikelihood) {

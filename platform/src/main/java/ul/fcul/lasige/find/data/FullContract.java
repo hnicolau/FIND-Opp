@@ -7,6 +7,12 @@ import android.provider.BaseColumns;
 import static com.google.common.collect.ObjectArrays.concat;
 
 /**
+ *  This class contains all URIs, table names, SQL statements, and other constants to be used by the
+ *  FIND content provider.
+ *
+ * @see android.content.ContentProvider
+ * @see ContentResolver
+ *
  * Created by hugonicolau on 04/11/2015.
  */
 public class FullContract {
@@ -666,7 +672,7 @@ public class FullContract {
      * also the reason why there is neither an _ID field nor any URI defined, and the primary key is
      * formed by the packet id together with the queue field.
      */
-    public static enum PacketQueues {
+    public enum PacketQueues {
         INCOMING, OUTGOING, FORWARDING;
 
         /**

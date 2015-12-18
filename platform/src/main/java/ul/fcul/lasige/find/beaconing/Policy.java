@@ -15,6 +15,8 @@ import java.util.Set;
 import ul.fcul.lasige.find.data.ConfigurationStore;
 
 /**
+ * Represents a set of permission for the FIND platform, particularly for network usage and switching.
+ *
  * Created by hugonicolau on 12/11/15.
  */
 public enum Policy {
@@ -53,31 +55,56 @@ public enum Policy {
     DISASTER(BeaconingInterval.RANDOM,
             Feature.values()),
 
+    /**
+     * This policy uses all available features to ONLY listen for neighbors by staying in AP mode.
+     * It is a battery draining policy to be used in very specific cases (e.g. debug).
+     */
     LISTENER (BeaconingInterval.FAST,
               Feature.FOREGROUND,
               Feature.WIFI_AP),
 
+    /**
+     * This policy uses all available features to ONLY search for neighbors by never going into AP mode.
+     */
     SEEKER(BeaconingInterval.FAST,
               Feature.WIFI_CLIENT,
               Feature.FOREGROUND);
 
 
+    // Policy variables
     private final BeaconingInterval mBeaconInterval;
     private final Set<Feature> mSupportedFeatures;
 
-    private Policy(BeaconingInterval beaconInterval, Feature... features) {
+    /**
+     * Constructor. Received a {@link BeaconingInterval} and array of features.
+     * @param beaconInterval Beaconing interval.
+     * @param features array of features.
+     * @see Feature
+     */
+    Policy(BeaconingInterval beaconInterval, Feature... features) {
         mBeaconInterval = beaconInterval;
 
+        // convert array to list
         final List<Feature> featureList = Arrays.asList(features);
+        // build set
         mSupportedFeatures =
                 featureList.size() > 0 ?
                         EnumSet.copyOf(featureList) : EnumSet.noneOf(Feature.class);
     }
 
+    /**
+     * Retrieves beaconing interval.
+     * @return A {@link BeaconingInterval} object.
+     */
     public BeaconingInterval getBeaconingInterval() {
         return mBeaconInterval;
     }
 
+    /**
+     * Checks whether a given feature is supported by the policy.
+     * @param feature Feature.
+     * @return true if it is allowed, false otherwise.
+     */
     public boolean allows(Feature feature) {
         return mSupportedFeatures.contains(feature);
     }
@@ -103,8 +130,8 @@ public enum Policy {
     /**
      * Returns the currently active policy.
      *
-     * @param context
-     * @return the currently active policy
+     * @param context Application context.
+     * @return the currently active policy.
      */
     public static Policy getCurrentPolicy(Context context) {
         return ConfigurationStore.getCurrentPolicy(context);
@@ -114,9 +141,9 @@ public enum Policy {
      * Replaces the currently active policy with a new one. If the new one is a different one, a
      * local broadcast is sent out to inform other components of the platform about the change.
      *
-     * @param context
-     * @param newPolicy the new policy to set as currently active
-     * @return true if the policy has changed (new policy is not the current one), false otherwise
+     * @param context Application context.
+     * @param newPolicy the new policy to set as currently active.
+     * @return true if the policy has changed (new policy is not the current one), false otherwise.
      */
     public static synchronized boolean setCurrentPolicy(Context context, Policy newPolicy) {
         final Policy currentPolicy = getCurrentPolicy(context);
@@ -138,8 +165,8 @@ public enum Policy {
      * Convenience function to register a receiver for the
      * {@link Policy#ACTION_POLICY_CHANGED POLICY_CHANGED} local broadcast.
      *
-     * @param context
-     * @param receiver
+     * @param context Application context.
+     * @param receiver Broadcast receiver.
      */
     public static void registerPolicyChangedReceiver(Context context, BroadcastReceiver receiver) {
         LocalBroadcastManager.getInstance(context).registerReceiver(
@@ -149,8 +176,8 @@ public enum Policy {
     /**
      * Convenience function to unregister a previously registered local broadcast receiver.
      *
-     * @param context
-     * @param receiver
+     * @param context Application context.
+     * @param receiver Broadcast receiver.
      * @see Policy#registerPolicyChangedReceiver(Context, BroadcastReceiver)
      */
     public static void unregisterPolicyChangedReceiver(Context context, BroadcastReceiver receiver) {
@@ -163,7 +190,7 @@ public enum Policy {
      * means that no regular beaconing will take place.
      *
      */
-     public static enum BeaconingInterval {
+     public enum BeaconingInterval {
         /**
          * No periodic beaconing. Beacons are only sent upon network changes or answering to other
          * beacons.
@@ -187,10 +214,11 @@ public enum Policy {
          */
         RANDOM(-2);
 
+        // beaconing interval
         private final int mInterval;
 
-        private BeaconingInterval(int minutes) {
-            mInterval = Math.max(-2, minutes * 60 * 1000);
+        BeaconingInterval(int minutes) {
+            mInterval = Math.max(-2, minutes * 60 * 1000); //-2 is a random interval; -1 is off
         }
 
         public int getIntervalMillis() {
@@ -199,6 +227,7 @@ public enum Policy {
 
         /**
          * Calculates the start timestamp for the next beaconing period.
+         * Throws an {@link IllegalStateException} when beaconing is turned off.
          *
          * @return a long indicating the timestamp in milliseconds when to schedule the next round
          *         of beaconing
@@ -222,9 +251,8 @@ public enum Policy {
      * Represents a feature of the FIND platform which can be dynamically turned on or off to save
      * power or increase overall connectivity.
      *
-     * @author brunf
      */
-    public static enum Feature {
+    public enum Feature {
         /**
          * Allows the platform to enable WLAN in client mode and switch between discovered networks
          * on its own (instead of only using networks which are already connected).
@@ -248,6 +276,6 @@ public enum Policy {
          * (hence the screen is on), he usually relies on a stable WLAN connection, which the
          * platform normally can not guarantee.
          */
-        FOREGROUND;
+        FOREGROUND
     }
 }

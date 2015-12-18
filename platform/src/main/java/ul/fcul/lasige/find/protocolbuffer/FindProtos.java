@@ -3,6 +3,9 @@
 
 package ul.fcul.lasige.find.protocolbuffer;
 
+/**
+ * This class is automatically generated. Read https://developers.google.com/protocol-buffers/?hl=en
+ */
 public final class FindProtos {
   private FindProtos() {}
   public static void registerAllExtensions(

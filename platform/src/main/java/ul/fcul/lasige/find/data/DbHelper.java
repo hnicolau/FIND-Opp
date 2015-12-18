@@ -8,24 +8,43 @@ import android.os.Build;
 import android.util.Log;
 
 /**
+ * Database helper that extends from {@link SQLiteOpenHelper}. It implements the singleton design
+ * pattern, thus it should be accessed through {@link DbHelper#getInstance(Context)} method.
+ *
+ * @see SQLiteOpenHelper
+ *
  * Created by hugonicolau on 04/11/2015.
  */
 public class DbHelper extends SQLiteOpenHelper {
     private static final String TAG = DbHelper.class.getSimpleName();
     private static final int DATABASE_VERSION = 1;
+    // db name
     protected static final String DATABASE_NAME = "find";
-
+    // singleton instance
     private static DbHelper sInstance;
 
+    /**
+     * Constructor, calls super.
+     * @param context Application context.
+     */
     private DbHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
+    /**
+     * Retrieves {@link DbHelper} singleton instance.
+     * @param context Application context.
+     * @return {@link DbHelper} object.
+     */
     public static synchronized DbHelper getInstance(Context context) {
         if (sInstance == null) { sInstance = new DbHelper(context); }
         return sInstance;
     }
 
+    /**
+     * Deletes platform's database.
+     * @param context Application context.
+     */
     public static synchronized void resetDatabase(Context context) {
         final DbHelper dbh = DbHelper.getInstance(context);
         dbh.close();
@@ -33,6 +52,10 @@ public class DbHelper extends SQLiteOpenHelper {
         dbh.getWritableDatabase();
     }
 
+    /**
+     * Creates platform's database.
+     * @param db Databased.
+     */
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.beginTransaction();

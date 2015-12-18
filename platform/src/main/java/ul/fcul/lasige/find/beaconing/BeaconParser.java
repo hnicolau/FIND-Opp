@@ -24,17 +24,24 @@ import ul.fcul.lasige.find.utils.InterruptibleFailsafeRunnable;
 import ul.fcul.lasige.find.data.FullContract.Neighbors;
 
 /**
- * Created by hugonicolau on 13/11/15.
+ * Class that extends from {@link InterruptibleFailsafeRunnable} and is able to parse
+ * all beacons (valid and invalid) from neighbors.
  *
- * Parses all beacons (valid and invalid) from neighbors
+ * @see InterruptibleFailsafeRunnable
+ *
+ * Created by hugonicolau on 13/11/15.
  */
 public class BeaconParser extends InterruptibleFailsafeRunnable {
     public static final String TAG = BeaconParser.class.getSimpleName();
 
+    // beaconing manager
     private final BeaconingManager mBM;
 
+    // queue of beacons to parse
     private final BlockingDeque<PossibleBeacon> mBeaconsToProcess = new LinkedBlockingDeque<>();
+    // set of known beacons - used to identify repeated beacons
     private final Set<ByteBuffer> mKnownBeacons = new HashSet<>();
+    // set of beacons that were processed
     private final Set<Integer> mProcessedBeacons = new HashSet<>();
 
     public BeaconParser(BeaconingManager context) {
@@ -42,6 +49,10 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         mBM = context;
     }
 
+    /**
+     * Add a beacon to be processed. Duplicate beacons are ignored.
+     * @param newBeacon Beacon
+     */
     public synchronized void addProcessableBeacon(PossibleBeacon newBeacon) {
         final ByteBuffer wrappedBeaconData = ByteBuffer.wrap(newBeacon.getRawData());
 
@@ -51,10 +62,16 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         }
     }
 
+    /**
+     * Clears all processed beacons.
+     */
     public synchronized void clearProcessedBeacons() {
         mProcessedBeacons.clear();
     }
 
+    /**
+     * main thread; blocks waiting for beacons to process
+     */
     @Override
     protected void execute() {
         while (!mThread.isInterrupted()) {
@@ -70,39 +87,45 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         }
     }
 
+    /**
+     * Checks whether it is a valid beacon and parses it.
+     * @param possibleBeacon Beacon
+     */
     private void parseSingleBeacon(PossibleBeacon possibleBeacon) {
         Log.d(TAG, "Parsing Beacon");
         final byte[] rawData = possibleBeacon.getRawData();
         final byte[] origin = possibleBeacon.getOrigin();
         final byte[] ownNodeId = possibleBeacon.getNodeId();
 
-        // Check if it's a beacon, and if we still need to process it
+        // check if it's a beacon, and if we still need to process it
         FindProtos.Beacon beacon;
         try {
             beacon = FindProtos.Beacon.parseFrom(rawData);
         } catch (InvalidProtocolBufferException e) {
-            // This is not a Beacon message
+            // this is not a Beacon message
             Log.e(TAG,
                     String.format(
                             "Received a %s packet from %s which is not a beacon!",
                             possibleBeacon.getSocketType().name().toLowerCase(Locale.US),
-                            origin),
+                            Arrays.toString(origin)),
                     e);
             return;
         }
 
         if (mProcessedBeacons.contains(beacon.getBeaconId())) {
-            // This beacon has already been processed before
+            // this beacon has already been processed before
             return;
         }
 
-        // It's a meaningful Beacon after all
+        // it's a meaningful Beacon after all
 
         final String networkName = possibleBeacon.getNetworkName();
-        final long referenceTimestamp = beacon.getTimeCreated();
+        final long referenceTimestamp = beacon.getTimeCreated(); // time beacon was originally created (remote time, careful)
+
+        // beacon was successfully parsed, notify callback
         mBM.onBeaconParsed(beacon, possibleBeacon, referenceTimestamp);
 
-        // Register the sender as neighbor
+        // register the sender as neighbor
         final FindProtos.Node sender = beacon.getSender();
         final ContentValues senderValues;
         try {
@@ -118,15 +141,17 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         }
 
         if (!senderIsOrigin(sender, origin)) {
-            // Mismatch, the beacon does not originate from the specified sender
+            // mismatch, the beacon does not originate from the specified sender
             Log.w(TAG, "(Would have) Rejected a relayed beacon.");
             Log.v(TAG, beacon.toString());
             // TODO: fail again? some old devices don't get IPv6 addresses, but send multicasts
             // return;
         }
         senderValues.put(Neighbors.COLUMN_NETWORK, networkName);
-        senderValues.put(Neighbors.COLUMN_TIME_LASTSEEN, possibleBeacon.getTimeReceived() /*TODO beacon.getTimeCreated()*/);
+        // set time last seen with our own local time, otherwise we have no control about sender's clock
+        senderValues.put(Neighbors.COLUMN_TIME_LASTSEEN, possibleBeacon.getTimeReceived() /*TODO original - beacon.getTimeCreated()*/);
 
+        // insert neighboor in database
         mBM.mDbController.insertNeighbor(senderValues, sender.getProtocolsList());
         Log.v(TAG, String.format(
                 "Received a %s beacon (%s, %s bytes) from node %s",
@@ -135,7 +160,7 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
                 rawData.length,
                 ByteUtils.bytesToHex(sender.getNodeId(), Neighbor.BYTES_SHORT_NODE_ID)));
 
-        // Register sender's neighbors
+        // register sender's neighbors
         for (final FindProtos.Node neighbor : beacon.getNeighborsList()) {
             final ContentValues otherNeighborValues;
             try {
@@ -149,15 +174,22 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
                 continue;
             }
 
+            // insert sender's neighbors in database
             mBM.mDbController.insertNeighbor(otherNeighborValues, neighbor.getProtocolsList());
         }
 
-        // Finished processing beacon
+        // finished processing beacon
         mProcessedBeacons.add(beacon.getBeaconId());
     }
 
+    /**
+     * Checks whether the sender actually created and sent the beacon.
+     * @param sender Sender node.
+     * @param originAddr Origin address.
+     * @return true if the sender is the origin of the beacon, false otherwise.
+     */
     private boolean senderIsOrigin(FindProtos.Node sender, byte[] originAddr) {
-        String originType = null;
+        String originType;
 
         switch (originAddr.length) {
             case 4: {
@@ -170,7 +202,7 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
                 break;
             }
             case 6: {
-                // Bluetooth address
+                // bluetooth address
                 final byte[] btAddress = sender.getBtAddress().toByteArray();
                 if (btAddress.length > 0 && Arrays.equals(btAddress, originAddr)) {
                     return true;
@@ -188,7 +220,7 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
                 break;
             }
             default: {
-                // Nothing we could use
+                // nothing we could use
                 Log.w(TAG, String.format(
                         "Unknown origin %s (length: %d)",
                         ByteUtils.bytesToHex(originAddr), originAddr.length));
@@ -202,17 +234,31 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         return false;
     }
 
+    /**
+     * Builds the {@link ContentValues} data structure from a {@link ul.fcul.lasige.find.protocolbuffer.FindProtos.Node}.
+     * @param node Node.
+     * @param ownNodeId Platform's node id.
+     * @param networkName Network name.
+     * @param referenceTime remote creation time.
+     * @return A {@link ContentValues} object.
+     * @throws EmptyNodeIdException
+     * @throws NodeIsUsException
+     * @see ContentValues
+     */
     private ContentValues extractContent(FindProtos.Node node, byte[] ownNodeId,
                                          String networkName, long referenceTime)
             throws EmptyNodeIdException, NodeIsUsException {
 
         final byte[] nodeId = node.getNodeId().toByteArray();
         if (nodeId.length == 0) {
+            // no node id information
             throw new EmptyNodeIdException();
         } else if (Arrays.equals(ownNodeId, nodeId)) {
+            // we created this beacon
             throw new NodeIsUsException();
         }
 
+        // build data structure
         final ContentValues values = new ContentValues();
         values.put(Neighbors.COLUMN_IDENTIFIER, nodeId);
         values.put(Neighbors.COLUMN_MULTICAST_CAPABLE, node.getMulticastCapable());
@@ -239,6 +285,9 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         return values;
     }
 
+    /**
+     * Exception for nodes without ids
+     */
     private class EmptyNodeIdException extends Exception {
         private static final long serialVersionUID = 289865661932401267L;
 
@@ -247,6 +296,9 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         }
     }
 
+    /**
+     * Exception for nodes that are us
+     */
     private class NodeIsUsException extends Exception {
         private static final long serialVersionUID = -143212430785316974L;
 
@@ -255,6 +307,9 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         }
     }
 
+    /**
+     * Represents a beacon that may be a beacon or not. It is not parsed, yet.
+     */
     public static final class PossibleBeacon {
         private final byte[] mRawData;
         private final byte[] mOrigin;
@@ -263,6 +318,15 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
         private final BeaconingManager.SocketType mReceivingSocketType;
         private final byte[] mReceiverNodeId;
 
+        /**
+         * Builds a possible beacon from a set of parameters.
+         * @param packet Packet.
+         * @param timeReceived Time received.
+         * @param networkName Network name.
+         * @param socketType Socket type.
+         * @param identity Identity.
+         * @return A {@link PossibleBeacon} object.
+         */
         public static PossibleBeacon from(DatagramPacket packet, long timeReceived,
                                           String networkName, BeaconingManager.SocketType socketType, Identity identity) {
 
@@ -275,6 +339,15 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
                     identity.getPublicKey());
         }
 
+        /**
+         * Builds a possible beacon from a set of parameters
+         * @param buffer Buffer.
+         * @param length Buffer's length.
+         * @param timeReceived Time received.
+         * @param btAddress Bluetooth address.
+         * @param identity Identity.
+         * @return A {@link PossibleBeacon} object.
+         */
         public static PossibleBeacon from(byte[] buffer, int length, long timeReceived,
                                           String btAddress, Identity identity) {
 
@@ -287,6 +360,15 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
                     identity.getPublicKey());
         }
 
+        /**
+         * Constructor.
+         * @param rawData Data.
+         * @param origin Origin node.
+         * @param timeReceived Time received.
+         * @param networkName Network name.
+         * @param socketType Socket type.
+         * @param receiverNodeId Receiver's node id.
+         */
         public PossibleBeacon(byte[] rawData, byte[] origin, long timeReceived, String networkName,
                               BeaconingManager.SocketType socketType, byte[] receiverNodeId) {
             mRawData = Arrays.copyOf(rawData, rawData.length);
@@ -297,26 +379,51 @@ public class BeaconParser extends InterruptibleFailsafeRunnable {
             mReceiverNodeId = receiverNodeId;
         }
 
+        /**
+         * Retrieves the possible beacon's raw data.
+         * @return Raw data.
+         */
         public byte[] getRawData() {
             return mRawData;
         }
 
+        /**
+         * Retrieves the possible beacon's origin.
+         * @return Origin.
+         */
         public byte[] getOrigin() {
             return mOrigin;
         }
 
+        /**
+         * Retrieves the possible beacon's time receive.
+         * @return Time received.
+         */
         public long getTimeReceived() {
             return mTimeReceived;
         }
 
+        /**
+         * Retrieves the network's name.
+         * @return Network name.
+         */
         public String getNetworkName() {
             return mReceivingNetworkName;
         }
 
+        /**
+         * Retrieves the socket type of the possible beacon.
+         * @return Socket type.
+         * @see ul.fcul.lasige.find.beaconing.BeaconingManager.SocketType
+         */
         public BeaconingManager.SocketType getSocketType() {
             return mReceivingSocketType;
         }
 
+        /**
+         * Retrieves the node id of the possible beacon.
+         * @return Node id.
+         */
         public byte[] getNodeId() {
             return mReceiverNodeId;
         }
