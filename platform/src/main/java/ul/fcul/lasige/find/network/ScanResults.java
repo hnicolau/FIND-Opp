@@ -11,11 +11,21 @@ import java.util.List;
 import java.util.Set;
 
 /**
+ * Class that represents WiFi scan results.
+ *
  * Created by hugonicolau on 13/11/15.
  */
 public class ScanResults {
+    // networks
     private final List<ScanResult> mAvailableNetworks = new ArrayList<>();
 
+    /**
+     * Constructor. Builds a list of available networks that include all FIND platform Access Points,
+     * open networks, and known (configured) networks. List is sorted by signal strength. FIND APs have priority,
+     * followed by open networks, and known networks.
+     * @param availableNetworks List of scanned networks.
+     * @param configuredNetworks List of configured (known) networks.
+     */
     public ScanResults(List<ScanResult> availableNetworks, List<WifiConfiguration> configuredNetworks) {
 
         final Set<String> knownSSIDs = new HashSet<>(configuredNetworks.size());
@@ -25,7 +35,7 @@ public class ScanResults {
 
         for (final ScanResult network : availableNetworks) {
             if (NetworkManager.isFindSSID(network.SSID)
-                    || (NetworkManager.isOpenNetwork(network) && network.level > -90)
+                    || (NetworkManager.isOpenNetwork(network) && network.level > -90) // TODO open networks are not being used for now
                     || knownSSIDs.contains(network.SSID)) {
                 mAvailableNetworks.add(network);
             }
@@ -34,14 +44,27 @@ public class ScanResults {
         Collections.sort(mAvailableNetworks, new SignalStrengthSorter());
     }
 
+    /**
+     * Checks whether there are available networks.
+     * @return true if there are one or more connectible networks, false otherwise.
+     */
     public boolean hasConnectibleNetworks() {
         return (mAvailableNetworks.size() > 0);
     }
 
+    /**
+     * Retrieves a list of available networks.
+     * @return A list of available networks
+     * @see ScanResult
+     */
     public List<ScanResult> getConnectibleNetworks() {
         return mAvailableNetworks;
     }
 
+    /**
+     * Comparator. If networks are of the same type, then compares signal strength. Otherwise, FIND
+     * APs have priority, followed by open networks, and known networks.
+     */
     private class SignalStrengthSorter implements Comparator<ScanResult> {
         @Override
         public int compare(ScanResult lhs, ScanResult rhs) {

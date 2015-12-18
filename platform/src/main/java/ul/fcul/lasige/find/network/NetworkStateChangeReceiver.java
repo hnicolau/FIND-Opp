@@ -16,24 +16,21 @@ import java.util.Set;
 import ul.fcul.lasige.find.utils.SafeBroadcastReceiver;
 
 /**
- * Created by hugonicolau on 13/11/15.
  *
  * Receiver for system broadcasts related to network connectivity state changes.
  *
+ * Created by hugonicolau on 13/11/15.
  */
 public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
 
     /**
      * Interface to be implemented by network state change listeners in FIND platform
      */
-    public static interface NetworkChangeListener {
-        public void onWifiAdapterChanged(boolean enabled);
-
-        public void onWifiNetworkChanged(boolean connected, boolean isFailover);
-
-        public void onBluetoothAdapterChanged(boolean enabled);
-
-        public void onAccessPointModeChanged(boolean activated);
+    public interface NetworkChangeListener {
+        void onWifiAdapterChanged(boolean enabled);
+        void onWifiNetworkChanged(boolean connected, boolean isFailover);
+        void onBluetoothAdapterChanged(boolean enabled);
+        void onAccessPointModeChanged(boolean activated);
     }
 
     /**
@@ -53,14 +50,11 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
      * States of the WiFi adapter when in AP mode. The ordinals correspond to the (hidden) integer
      * constants in the {@link NetworkManager}.
      */
-    private enum ApState {
-        DISABLING, DISABLED, ENABLING, ENABLED, FAILED;
-    }
+    private enum ApState { DISABLING, DISABLED, ENABLING, ENABLED, FAILED }
 
     private static final Set<Integer> INTERESTING_WIFI_ADAPTER_STATES = new HashSet<>(3);
     private static final Set<Integer> INTERESTING_BT_ADAPTER_STATES = new HashSet<>(3);
-    private static final EnumSet<ApState> INTERESTING_AP_STATES =
-            EnumSet.of(ApState.DISABLING, ApState.ENABLED);
+    private static final EnumSet<ApState> INTERESTING_AP_STATES = EnumSet.of(ApState.DISABLING, ApState.ENABLED);
     static {
         INTERESTING_WIFI_ADAPTER_STATES.add(WifiManager.WIFI_STATE_DISABLING);
         INTERESTING_WIFI_ADAPTER_STATES.add(WifiManager.WIFI_STATE_ENABLED);
@@ -69,27 +63,45 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
         INTERESTING_BT_ADAPTER_STATES.add(BluetoothAdapter.STATE_ON);
     }
 
+    // callbacks
     private final HashSet<NetworkChangeListener> mCallbacks = new HashSet<>();
-
+    // are we connected?
     private boolean mIsWifiConnected;
 
+    /**
+     * Returns whether there are listeners registered.
+     * @return true if there are listeners registered, false otherwise.
+     */
     protected boolean hasListeners() {
         return !mCallbacks.isEmpty();
     }
 
+    /**
+     * Register network change listener.
+     * @param listener Listener.
+     */
     protected void registerListener(NetworkChangeListener listener) {
         mCallbacks.add(listener);
     }
 
+    /**
+     * Unregister network change listener.
+     * @param listener listener.
+     */
     protected void unregisterListener(NetworkChangeListener listener) {
         mCallbacks.remove(listener);
     }
 
+    /**
+     * Returns an {@link IntentFilter} with the following actions: {@link NetworkStateChangeReceiver#WIFI_AP_STATE_CHANGED_ACTION},
+     * {@link WifiManager#WIFI_STATE_CHANGED_ACTION}, and {@link ConnectivityManager#CONNECTIVITY_ACTION}.
+     * @return An {@link IntentFilter} object.
+     */
     @Override
     protected IntentFilter getIntentFilter() {
         final IntentFilter filter = new IntentFilter();
         filter.addAction(WIFI_AP_STATE_CHANGED_ACTION);
-        filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+        filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION); // TODO alternatively we could listen for all connectivity changes: "android.net.conn.CONNECTIVITY_CHANGE"
         //TODO filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         return filter;
@@ -103,6 +115,7 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
 
         switch (intent.getAction()) {
             case WIFI_AP_STATE_CHANGED_ACTION: {
+                // get state
                 int currentStateInt = intent.getIntExtra(EXTRA_WIFI_AP_STATE, 4);
 
                 final ApState[] states = ApState.values();
@@ -113,8 +126,10 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
 
                 final ApState currentState = states[currentStateInt];
                 if (INTERESTING_AP_STATES.contains(currentState)) {
+                    // enabled or disabling
                     final boolean isActivated = (currentState == ApState.ENABLED);
                     for (NetworkChangeListener callback : mCallbacks) {
+                        // notify listeners of ap mode change
                         callback.onAccessPointModeChanged(isActivated);
                     }
                 }
@@ -122,12 +137,14 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
             }
 
             case WifiManager.WIFI_STATE_CHANGED_ACTION: {
-                // The state of the WiFi adapter has changed
+                // the state of the WiFi adapter has changed
                 final int newState = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN);
 
                 if (INTERESTING_WIFI_ADAPTER_STATES.contains(newState)) {
+                    // disabled or enable
                     final boolean isActivated = (newState == WifiManager.WIFI_STATE_ENABLED);
                     for (NetworkChangeListener callback : mCallbacks) {
+                        // notify listeners of adapter change
                         callback.onWifiAdapterChanged(isActivated);
                     }
                 }
@@ -149,10 +166,10 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
             }*/
 
             case ConnectivityManager.CONNECTIVITY_ACTION: {
-                // A currently connected network has changed
+                // a currently connected network has changed
                 final NetworkInfo affectedNetwork = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                 if (affectedNetwork.getType() != ConnectivityManager.TYPE_WIFI) {
-                    // We're only interested in WiFi network changes
+                    // we're only interested in WiFi network changes
                     break;
                 }
 
@@ -163,8 +180,8 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
                 final boolean stillConnected = (affectedNetwork.isConnected() || !noConnectivity);
                 final boolean wifiFailover = isFailover && (failoverNetwork.getType() == ConnectivityManager.TYPE_WIFI);
 
-                if (stillConnected == mIsWifiConnected) {
-                    // Connectivity state is still the same.
+                if (stillConnected == mIsWifiConnected) { // TODO could be a different network?
+                    // connectivity state is still the same.
                     break;
                 }
 

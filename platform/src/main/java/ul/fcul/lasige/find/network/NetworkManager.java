@@ -36,27 +36,37 @@ import java.util.Set;
 import ul.fcul.lasige.find.apps.TokenGenerator;
 
 /**
+ * The class provides basic mechanisms to manipulate the WiFi adapter. It implements the Singleton design
+ * pattern and should be accessed through {@link NetworkManager#getInstance(Context)}.
+ *
  * Created by hugonicolau on 13/11/15.
  */
 public class NetworkManager {
-    public static final String BASE_AP_NAME = "FindAP";
-
     private static final String TAG = NetworkManager.class.getSimpleName();
+
+    public static final String BASE_AP_NAME = "FindAP";
     private static final String ERROR_MSG_NO_AP_MANIP = "AP manipulation not available.";
     private static final String ERROR_MSG_NO_3G_MANIP = "Mobile Data manipulation not available.";
 
+    // singleton instance
     private static NetworkManager sInstance;
     //TODO private static String sBluetoothAddressString;
 
     private final Context mContext;
+    // WiFi lock, not reference counted
     private final WifiManager.WifiLock mWifiLock;
     //TODO private final WifiManager.MulticastLock mMulticastLock;
+    // lock count
+    private int mWifiConnectionLockCount;
+    //TODO private int mBtConnectionLockCount;
 
     protected final ConnectivityManager mConnectivityManager;
     protected final WifiManager mWifiManager;
     protected final BluetoothAdapter mBluetoothAdapter;
+    // network callback
     private final NetworkStateChangeReceiver mConnectivityReceiver;
 
+    // network states
     private final Deque<NetworkManagerState> mPreviousNetworkManagerStates = new ArrayDeque<>();
 
     private final Optional<Method> mGetMobileDataEnabled;
@@ -64,12 +74,14 @@ public class NetworkManager {
     private final Optional<Method> mIsWifiApEnabled;
     private final Optional<Method> mSetWifiApEnabled;
 
-    private int mWifiConnectionLockCount;
-    //TODO private int mBtConnectionLockCount;
-
     private WifiConfiguration mApConfig;
     private boolean mIsBtEnabling;
 
+    /**
+     * Provides access to singleton instance.
+     * @param context Application context.
+     * @return A {@link NetworkManager} object.
+     */
     public static synchronized NetworkManager getInstance(Context context) {
         if (sInstance == null) {
             sInstance = new NetworkManager(context);
@@ -78,22 +90,26 @@ public class NetworkManager {
         return sInstance;
     }
 
+    /**
+     * Constructor
+     * @param context Application context.
+     */
     private NetworkManager(Context context) {
         mContext = context;
 
-        // Android system services
+        // android system services
         mConnectivityManager = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
         mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         mConnectivityReceiver = new NetworkStateChangeReceiver();
 
-        // Locks
+        // locks
         mWifiLock = mWifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "FindWifiLock");
         mWifiLock.setReferenceCounted(false);
         /*TODO mMulticastLock = mWifiManager.createMulticastLock("FindMulticastLock");
         mMulticastLock.setReferenceCounted(false);*/
 
-        // Discover hidden WLAN AP state methods using reflection
+        // discover hidden WLAN AP state methods using reflection
         Class<? extends WifiManager> wmClass = mWifiManager.getClass();
         mIsWifiApEnabled = getAccessibleMethod(wmClass, "isWifiApEnabled");
         mSetWifiApEnabled = getAccessibleMethod(wmClass, "setWifiApEnabled",
@@ -119,8 +135,14 @@ public class NetworkManager {
     /*
      * NETWORK STATE CHANGE NOTIFICATIONS
      */
+    /**
+     * Registers callback for connectivity changes.
+     * @param callback Callback.
+     * @see NetworkStateChangeReceiver
+     */
     public void registerForConnectivityChanges(NetworkStateChangeReceiver.NetworkChangeListener callback) {
         if (!mConnectivityReceiver.hasListeners()) {
+            // fist listener, register context in receiver
             mConnectivityReceiver.register(mContext);
         }
         mConnectivityReceiver.registerListener(callback);
@@ -131,15 +153,25 @@ public class NetworkManager {
         //TODO callback.onBluetoothAdapterChanged(isBluetoothEnabled());
     }
 
+    /**
+     * Unregisters callback for connectivity changes.
+     * @param callback Callback
+     */
     public void unregisterForConnectivityChanges(NetworkStateChangeReceiver.NetworkChangeListener callback) {
         mConnectivityReceiver.unregisterListener(callback);
         if (!mConnectivityReceiver.hasListeners()) {
+            // last listener, unregister context in receiver
             mConnectivityReceiver.unregister(mContext);
         }
     }
 
     /*
      * SAVEPOINTS
+     */
+
+    /**
+     * Retrieves the number of savepoint stored in the {@link NetworkManager}.
+     * @return Number of savepoints.
      */
     public int getSavepointCount() {
         return mPreviousNetworkManagerStates.size();
@@ -154,7 +186,9 @@ public class NetworkManager {
      * @see NetworkManager#rollback()
      */
     public void createSavepoint() {
+        // get state
         NetworkManagerState currentState = NetworkManagerState.captureCurrentState(this);
+        // store it
         mPreviousNetworkManagerStates.push(currentState);
         Log.v(TAG, String.format("Created savepoint %d: %s", mPreviousNetworkManagerStates.size(), currentState));
     }
@@ -167,8 +201,7 @@ public class NetworkManager {
      */
     public void rollback() {
         if (mPreviousNetworkManagerStates.size() == 0) {
-            throw new IllegalStateException(
-                    "There is no savepoint to rollback to: create one first.");
+            throw new IllegalStateException("There is no savepoint to rollback to: create one first.");
         }
 
         NetworkManagerState.restorePreviousState(this, mPreviousNetworkManagerStates.pop());
@@ -178,21 +211,27 @@ public class NetworkManager {
     /*
      * LOCKS
      */
-
+    /**
+     * Acquire WiFi locks. These are not reference counted, so acquiring multiple times is safe: If it is
+     * already acquired, nothing happens.
+     */
     public void acquireLocks() {
-        // Both locks are not reference-counted, so acquiring multiple times is safe: If it is
-        // already acquired, nothing happens.
         mWifiLock.acquire();
         //TODO mMulticastLock.acquire();
     }
 
+    /**
+     * Release WiFi locks. These are not reference counted, so releasing multiple times is safe: The first call
+     * to release() will actually release the lock, the others get ignored.
+     */
     public void releaseLocks() {
-        // Both locks are not reference-counted, so releasing multiple times is safe: The first call
-        // to release() will actually release the lock, the others get ignored.
         mWifiLock.release();
         //TODO mMulticastLock.release();
     }
 
+    /**
+     * Reset all connection locks maintaining current lock state.
+     */
     public void resetConnectionLocks() {
         Log.v(TAG, String.format("Resetting connection locks: WiFi %d->0, Bluetooth %d->0",
                 mWifiConnectionLockCount, 0/*TODO mBtConnectionLockCount*/));
@@ -201,11 +240,10 @@ public class NetworkManager {
     }
 
     // WIFI MANAGEMENT
-
     /**
      * Describes the current state of the WiFi adapter.
      */
-    public static enum WifiState {
+    public enum WifiState {
         /**
          * The WiFi adapter is currently not connected to any network.
          */
@@ -221,28 +259,37 @@ public class NetworkManager {
         /**
          * This device is currently in access point mode, possibly serving other FIND clients.
          */
-        FIND_AP;
-    }
-
-    public boolean isWifiConnected() {
-        final NetworkInfo networkInfo =
-                mConnectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-        return networkInfo.isConnected();
-    }
-
-    private boolean isWifiConnected(ScanResult network) {
-        return isWifiConnected() && network.SSID.equals(NetworkManager.unquoteSSID(mWifiManager.getConnectionInfo().getSSID()))
-                && network.BSSID.equals(mWifiManager.getConnectionInfo().getBSSID());
-        //return wifiConfiguration.status == WifiConfiguration.Status.CURRENT;
+        FIND_AP
     }
 
     /**
-     * Returns the current state of the WiFi adapter
+     * Returns whether the WiFi connectivity exists.
+     * @return true if connectivity exists, false otherwise.
+     */
+    @SuppressWarnings("deprecation")
+    public boolean isWifiConnected() {
+        final NetworkInfo networkInfo = mConnectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        return networkInfo.isConnected();
+    }
+
+    /**
+     * Checks whether a connection exist with a given network.
+     * @param network Network.
+     * @return true if a connection exists with network, false otherwise.
+     */
+    private boolean isWifiConnected(ScanResult network) {
+        return isWifiConnected() && network.SSID.equals(NetworkManager.unquoteSSID(mWifiManager.getConnectionInfo().getSSID()))
+                && network.BSSID.equals(mWifiManager.getConnectionInfo().getBSSID());
+        //return wifiConfiguration.status == WifiConfiguration.Status.CURRENT; ORIGINAL
+    }
+
+    /**
+     * Returns the current state of the WiFi adapter.
      *
      * @return one of {@link WifiState#DISCONNECTED DISCONNECTED},
      *         {@link WifiState#STA_ON_PUBLIC_AP STA_ON_PUBLIC_AP},
      *         {@link WifiState#STA_ON_FIND_AP STA_ON_FIND_AP} or {@link WifiState#FIND_AP
-     *         FIND_AP}
+     *         FIND_AP}.
      */
     public WifiState getWifiState() {
         WifiState currentState = WifiState.DISCONNECTED;
@@ -266,18 +313,20 @@ public class NetworkManager {
     /**
      * Finds the network interface that is used for WiFi.
      *
-     * @return the WiFi network interface
+     * @return the WiFi network interface.
      */
     public synchronized Optional<NetworkInterface> getWifiNetworkInterface() {
         NetworkInterface wifiInterface = null;
 
         try {
-            final List<NetworkInterface> networkInterfaces =
-                    Collections.list(NetworkInterface.getNetworkInterfaces());
+            // get all network interfaces
+            final List<NetworkInterface> networkInterfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
 
+            // for each of the interfaces
             for (NetworkInterface iface : networkInterfaces) {
                 final String name = iface.getName();
                 if (name.equals("wlan0") || name.equals("eth0") || name.equals("wl0.1")) {
+                    // it is a wifi network interface!
                     wifiInterface = iface;
                     break;
                 }
@@ -289,6 +338,10 @@ public class NetworkManager {
         return Optional.fromNullable(wifiInterface);
     }
 
+    /**
+     * Retrieves a list of previously configured (known) networks.
+     * @return List of known networks.
+     */
     public List<WifiConfiguration> getConfiguredWifiNetworks() {
         final List<WifiConfiguration> networks = mWifiManager.getConfiguredNetworks();
         return (networks == null ? new ArrayList<WifiConfiguration>() : networks);
@@ -332,26 +385,39 @@ public class NetworkManager {
         return addresses;
     }
 
+    /**
+     * Start WiFi scan. This will trigger an asynchronous callback to {@link ScanResultsReceiver.ScanResultsListener#onWifiScanCompleted()}
+     * @return true if scan started, false otherwise.
+     */
     public boolean initiateWifiScan() {
         Log.d(TAG, "Initiated WiFi scan");
         return mWifiManager.startScan();
     }
 
+    /**
+     * Retrieves a list of networks originated from a WiFi scan.
+     * @return A {@link ScanResults} object.
+     * @see ScanResults
+     */
     public ScanResults getScanResults() {
         return new ScanResults(mWifiManager.getScanResults(), getConfiguredWifiNetworks());
     }
 
-    // unchecked
+    /**
+     * Attempts to connect to a given network. Disconnects from current network if needed.
+     * @param network Network
+     * @return true if connection with network already existed, false otherwise.
+     */
     public boolean connectToWifi(ScanResult network) {
         Log.v(TAG, "Requested to connect to network " + network.SSID + " / " + network.BSSID);
 
-        // Check if network is already configured
+        // check if network is already configured
         int networkId = -1;
         for (WifiConfiguration wifiConfiguration : getConfiguredWifiNetworks()) {
             if (network.SSID.equals(NetworkManager.unquoteSSID(wifiConfiguration.SSID))) {
                 if (wifiConfiguration.BSSID == null || wifiConfiguration.BSSID.equals(network.BSSID)) {
                     if (isWifiConnected(network)) {
-                        // Already connected to the requested network
+                        // already connected to the requested network
                         Log.d(TAG, "already connected");
                         return true;
                     }
@@ -435,7 +501,6 @@ public class NetworkManager {
     }
 
     // WIFI AP MANAGEMENT
-
     /**
      * Checks whether access point mode manipulation methods are available for this device or not.
      *
@@ -529,6 +594,12 @@ public class NetworkManager {
         return success.get();
     }
 
+    /**
+     * Builds a {@link WifiConfiguration} object that is composed by a given base name and key.
+     * @param baseApName Base name.
+     * @param keyMgmt Key.
+     * @return A {@link WifiConfiguration} object.
+     */
     private WifiConfiguration createBaseApConfig(String baseApName, int keyMgmt) {
         WifiConfiguration baseWifiConfig = new WifiConfiguration();
         baseWifiConfig.SSID = baseApName + "-" + TokenGenerator.generateToken(4);
@@ -536,7 +607,13 @@ public class NetworkManager {
         return baseWifiConfig;
     }
 
-    // UTILS
+    /*
+     * UTILS
+     */
+    /**
+     * Checks if there is Internet access with the current connection.
+     * @return true if Internet is accessible via current connection, false otherwise.
+     */
     public boolean hasInternetAccess() {
         NetworkInfo netInfo = mConnectivityManager.getActiveNetworkInfo();
         //should check null because in air plan mode it will be null
@@ -547,6 +624,10 @@ public class NetworkManager {
         return false;
     }
 
+    /**
+     * Pings google's dns.
+     * @return true if operation was sucessful, false otherwise.
+     */
     private boolean ping() {
         Runtime runtime = Runtime.getRuntime();
         try
@@ -555,6 +636,7 @@ public class NetworkManager {
             int mExitValue = mIpAddrProcess.waitFor();
             System.out.println("mExitValue "+mExitValue);
             if(mExitValue==0){
+                // YES!
                 return true;
             }else{
                 return false;
@@ -573,7 +655,11 @@ public class NetworkManager {
         return false;
     }
 
-    // UNUSED
+    /**
+     * Creates a secure Access Point configuration with a given SSID and password.
+     * @param ssid SSID.
+     * @param password Password.
+     */
     public void createSecureApConfig(String ssid, String password) {
         if (ssid == null) {
             throw new NullPointerException("SSID must not be null.");
@@ -587,14 +673,21 @@ public class NetworkManager {
         mApConfig.preSharedKey = password;
     }
 
+    /**
+     * Retrieves the current Access Point configuration.
+     *
+     * @return A {@link WifiConfiguration} object.
+     */
     public Optional<WifiConfiguration> getApConfiguration() {
         WifiConfiguration apConfig = null;
 
-        final Optional<Method> getApConfig =
-                getAccessibleMethod(mWifiManager.getClass(), "getWifiApConfiguration");
+        // use reflection to get method
+        final Optional<Method> getApConfig = getAccessibleMethod(mWifiManager.getClass(), "getWifiApConfiguration");
 
         if (getApConfig.isPresent()) {
+            // success
             try {
+                // get config
                 apConfig = (WifiConfiguration) getApConfig.get().invoke(mWifiManager);
             } catch (IllegalAccessException
                     | IllegalArgumentException
@@ -606,13 +699,21 @@ public class NetworkManager {
         return Optional.fromNullable(apConfig);
     }
 
+    /**
+     * Sets Access Point configuration with a given {@link WifiConfiguration} object.
+     * @param apConfig Access Point configuration.
+     * @return true if successful, false otherwise.
+     */
     public boolean setApConfiguration(Optional<WifiConfiguration> apConfig) {
         if (apConfig.isPresent()) {
+            // use reflection to get method
             final Optional<Method> setApConfig = getAccessibleMethod(
                     mWifiManager.getClass(), "setWifiApConfiguration", WifiConfiguration.class);
 
             if (setApConfig.isPresent()) {
+                // success
                 try {
+                    // set configuration
                     return (Boolean) setApConfig.get().invoke(mWifiManager, apConfig.get());
                 } catch (IllegalAccessException
                         | IllegalArgumentException
@@ -624,11 +725,10 @@ public class NetworkManager {
         return false;
     }
 
-    // unchecked
     /**
      * Checks whether the device can turn into an access point for tethering.
      *
-     * @return true if the device can act as access point, false otherwise
+     * @return true if the device can act as access point, false otherwise.
      */
     public boolean hasApCapabilities() {
         Optional<WifiConfiguration> apConfig = getApConfiguration();
@@ -643,7 +743,6 @@ public class NetworkManager {
     }
 
     // MOBILE DATA (3G) MANIPULATION
-
     /**
      * Checks whether mobile data is enabled or not, failing silently if this can't be determined.
      *
@@ -878,6 +977,11 @@ public class NetworkManager {
         return parsedBytes;
     }
 
+    /**
+     * Creates an hexadecimal MAC address string from individual bytes.
+     * @param macAddress Mac address as byte array.
+     * @return Hexadecial mac address.
+     */
     public static String unparseMacAddress(byte[] macAddress) {
         if (macAddress == null || macAddress.length == 0) {
             return null;
@@ -894,13 +998,14 @@ public class NetworkManager {
     }
 
     /**
+     * THIS METHOD IS ALWAYS RETURNIN FALSE;
      * Determines whether a WiFi network is open (unencrypted).
      *
      * @param network the result of a network scan
      * @return true if the network is open
      */
     public static boolean isOpenNetwork(ScanResult network) {
-        /*TODO if (network.capabilities != null) {
+        /*if (network.capabilities != null) {
             if (network.capabilities.equals("") || network.capabilities.equals("[ESS]")) {
                 return true;
             }
@@ -922,7 +1027,7 @@ public class NetworkManager {
     /**
      * Set of Phone Models that do not receive Multicast/Broadcast packets when the screen is off.
      */
-    private static final Set<String> sRxMulticastModels = new HashSet<String>();
+    private static final Set<String> sRxMulticastModels = new HashSet<>();
     static {
         sRxMulticastModels.add("Nexus One");
         sRxMulticastModels.add("HTC Desire");
