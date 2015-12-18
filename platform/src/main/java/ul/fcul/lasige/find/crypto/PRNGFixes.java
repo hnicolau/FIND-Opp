@@ -1,10 +1,11 @@
 package ul.fcul.lasige.find.crypto;
 
 /**
- * Created by hugonicolau on 05/11/2015.
  *
  * This class is taken directly from the Android blog post announcing this bug:
  * http://android-developers.blogspot.com/2013/08/some-securerandom-thoughts.html
+ *
+ * Created by hugonicolau on 05/11/2015.
  */
 
 import android.os.*;
