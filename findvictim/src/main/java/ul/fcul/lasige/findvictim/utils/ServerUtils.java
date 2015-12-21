@@ -5,9 +5,7 @@ import android.content.Context;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.findvictim.data.Message;
-import ul.fcul.lasige.findvictim.data.TokenStore;
 
 /**
  * Created by hugonicolau on 07/12/15.
@@ -18,7 +16,7 @@ public class ServerUtils {
         JSONObject json = new JSONObject();
 
         try {
-            json.put("nodeid", message.Sender);
+            json.put("nodeid", message.OriginMac);
             json.put("timestamp", message.TimeSent);
             json.put("latitude", message.LocationLatitude);
             json.put("longitude", message.LocationLongitude);
@@ -31,7 +29,7 @@ public class ServerUtils {
             json.put("msg", ""); // TODO
             /*json.put("status", ""); // deprecated
             json.put("statusTimestamp", 0); // deprecated
-            json.put("origin", message.Sender);
+            json.put("origin", message.OriginMac);
             json.put("target", ""); // deprecated
             json.put("targetLatitude", 0); // deprecated
             json.put("targetLongitude", 0); // deprecated

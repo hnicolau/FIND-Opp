@@ -25,7 +25,7 @@ public class Message implements Serializable{
     private static final long serialVersionUID = 4793280315313094725L;
 
     // id
-    public String Sender;
+    public String OriginMac;
     public String GoogleAccount;
     public long TimeSent;
     public long TimeReceived;
@@ -42,7 +42,7 @@ public class Message implements Serializable{
     // hash is used as an unique identifier of the message (sender, content, timesent)
     public String getHash() {
         if (mHash == null) {
-            String raw = String.format(Locale.US, "%s|%s|%d", Sender, GoogleAccount, TimeSent);
+            String raw = String.format(Locale.US, "%s|%s|%d", OriginMac, GoogleAccount, TimeSent);
             try {
                 mHash = createHash(raw);
             } catch (NoSuchAlgorithmException e) {
@@ -67,7 +67,7 @@ public class Message implements Serializable{
 
     public static byte[] serialize(Message message) {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutput out = null;
+        ObjectOutput out;
         byte[] buffer = null;
 
         try {

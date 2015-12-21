@@ -2,9 +2,7 @@ package ul.fcul.lasige.findvictim.data;
 
 import android.content.Context;
 import android.location.Location;
-import android.util.Log;
 
-import ul.fcul.lasige.find.lib.service.FindConnector;
 import ul.fcul.lasige.findvictim.sensors.SensorManager;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
 
@@ -37,7 +35,7 @@ public class MessageGenerator {
 
             // build message
             Message message = new Message();
-            message.Sender = TokenStore.getMacAddress(mContext);
+            message.OriginMac = TokenStore.getMacAddress(mContext);
             message.GoogleAccount = TokenStore.getGoogleAccount(mContext);
             message.TimeSent = System.currentTimeMillis();
             message.TimeReceived = -1;
