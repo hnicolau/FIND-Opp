@@ -19,11 +19,15 @@ import ul.fcul.lasige.find.data.FullContract;
 
 
 /**
+ * Fragment that shows the platform's registered client applications.
+ *
  * Created by hugonicolau on 04/11/2015.
  */
 public class AppsFragment extends Fragment {
 
+    // data cursor adapter
     private SimpleCursorAdapter mAdapter;
+    // database controller
     private DbController mDbController;
 
     @Override
@@ -41,9 +45,10 @@ public class AppsFragment extends Fragment {
         int[] to = { android.R.id.text1 };
         String[] from = { FullContract.Apps.COLUMN_PACKAGE_NAME };
 
+        // create adapter
         mAdapter = new SimpleCursorAdapter(getActivity(), layout, cursor, from, to, 0);
 
-        // set adapter
+        // set adapter and populate view
         ListView listView = (ListView) view.findViewById(R.id.appslistview);
         listView.setAdapter(mAdapter);
 

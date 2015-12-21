@@ -25,11 +25,13 @@ import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.find.network.NetworkManager;
 
 /**
+ * Fragment that shows the platform's packets (incoming and outgoing).
  * Created by hugonicolau on 04/11/2015.
  */
 public class PacketsFragment extends Fragment {
     private final static String TAG = PacketsFragment.class.getSimpleName();
 
+    // adapter
     private PacketListAdapter mAdapter;
 
     @Override
@@ -41,10 +43,11 @@ public class PacketsFragment extends Fragment {
         // get data
         Cursor cursor = getActivity().getContentResolver().query(FullContract.Packets.URI_ALL, null, null, null, null);
 
-        // get adapter (data)
+        // create adapter (data)
         mAdapter = new PacketListAdapter(getActivity(), cursor);
+        cursor.close();
 
-        // set adapter
+        // set adapter and populate view
         ListView listView = (ListView) view.findViewById(R.id.packetslistview);
         listView.setAdapter(mAdapter);
 
@@ -60,11 +63,12 @@ public class PacketsFragment extends Fragment {
         mAdapter.changeCursor(cursor);
     }
 
-    /*
-     * NeighborListAdapter
+    /**
+     * Auxiliary class that extends from {@link BaseAdapter} and populates a list view with a set of packets.
      */
     private static class PacketListAdapter extends BaseAdapter {
         private final LayoutInflater mInflater;
+        // list of packets
         private List<PacketViewModel> mList;
 
         public PacketListAdapter(Context context, Cursor cursor) {
@@ -82,6 +86,14 @@ public class PacketsFragment extends Fragment {
         @Override
         public long getItemId(int position) { return position; }
 
+        /**
+         * Returns a View that represents a packet. It show the packet's data, the queues it is in, and its
+         * protocol.
+         * @param position Position in list.
+         * @param convertView Packet view.
+         * @param parent Parent view.
+         * @return Packet view.
+         */
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             convertView = mInflater.inflate(R.layout.list_item_packet, null);
@@ -110,8 +122,13 @@ public class PacketsFragment extends Fragment {
             notifyDataSetChanged();
         }
 
+        /**
+         * Returns an array list from a given data cursor.
+         * @param cursor Data cursor
+         * @return List of packets.
+         */
         private ArrayList<PacketViewModel> buildListFromCursor(Cursor cursor) {
-            ArrayList<PacketViewModel> packets = new ArrayList<PacketViewModel>();
+            ArrayList<PacketViewModel> packets = new ArrayList<>();
             while (cursor.moveToNext()) {
                 final PacketViewModel packet = PacketViewModel.fromCursor(cursor);
                 packets.add(packet);

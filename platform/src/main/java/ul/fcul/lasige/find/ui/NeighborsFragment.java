@@ -29,11 +29,14 @@ import ul.fcul.lasige.find.lib.data.Neighbor;
 import ul.fcul.lasige.find.network.NetworkManager;
 
 /**
+ * Fragment that shows the platform's neighbors that were seen at some point in time.
+ *
  * Created by hugonicolau on 16/11/15.
  */
 public class NeighborsFragment extends Fragment {
     private final static String TAG = NeighborsFragment.class.getSimpleName();
 
+    // data cursor adapter
     private NeighborListAdapter mAdapter;
     private DbController mDbController;
 
@@ -45,12 +48,13 @@ public class NeighborsFragment extends Fragment {
 
         // get data
         mDbController = new DbController(getActivity());
+        // get all neighbors
         Set<Neighbor> list = mDbController.getNeighbors(0);
 
-        // get adapter (data)
+        // create adapter (data)
         mAdapter = new NeighborListAdapter(getActivity(), list);
 
-        // set adapter
+        // set adapter and populate view
         ListView listView = (ListView) view.findViewById(R.id.neighborslistview);
         listView.setAdapter(mAdapter);
 
@@ -66,8 +70,8 @@ public class NeighborsFragment extends Fragment {
         mAdapter.changeList(list);
     }
 
-    /*
-     * NeighborListAdapter
+    /**
+     * Adapter that extends from {@link BaseAdapter} and represents a list of neighbors.
      */
     private static class NeighborListAdapter extends BaseAdapter {
         private final LayoutInflater mInflater;
@@ -75,7 +79,7 @@ public class NeighborsFragment extends Fragment {
 
         public NeighborListAdapter(Context context, Set<Neighbor> list) {
             super();
-            mList = new ArrayList<Neighbor>(list);
+            mList = new ArrayList<>(list);
             mInflater = LayoutInflater.from(context);
         }
 
@@ -88,6 +92,14 @@ public class NeighborsFragment extends Fragment {
         @Override
         public long getItemId(int position) { return position; }
 
+        /**
+         * Returns a view that represents a neighbor. It is composed of the neighbor's node id (public key),
+         * network it was seen and elapsed time since it was seen last time.
+         * @param position Position in list.
+         * @param convertView Neighbor view.
+         * @param parent parent view.
+         * @return Neighbor view.
+         */
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             convertView = mInflater.inflate(R.layout.list_item_neighbor, null);
@@ -125,7 +137,7 @@ public class NeighborsFragment extends Fragment {
 
             mList.clear();
             if (newList != null) {
-                mList = new ArrayList<Neighbor>(newList);
+                mList = new ArrayList<>(newList);
             }
             notifyDataSetChanged();
         }

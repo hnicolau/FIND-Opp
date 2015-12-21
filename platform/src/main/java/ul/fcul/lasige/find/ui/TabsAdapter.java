@@ -5,6 +5,8 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
 
 /**
+ * Defines the tabs existing in the FIND platform UI.
+ *
  * Created by hugonicolau on 09/10/15.
  */
 public class TabsAdapter extends FragmentStatePagerAdapter {

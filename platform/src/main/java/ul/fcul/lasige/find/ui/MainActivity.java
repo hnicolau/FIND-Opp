@@ -8,7 +8,6 @@ import android.os.IBinder;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.ActionBarActivity;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
@@ -16,11 +15,16 @@ import ul.fcul.lasige.find.R;
 import ul.fcul.lasige.find.service.SupervisorService;
 
 /**
+ * Entry point for platform's User Interface. It extends {@link ActionBarActivity} proving a tab navigation.
+ * The UI contains 5 tabs (fragments): policy, applications, protocols, neighbors, and packets.
+ *
  * Created by hugonicolau on 04/11/2015.
  */
+@SuppressWarnings("deprecation")
 public class MainActivity extends ActionBarActivity implements android.support.v7.app.ActionBar.TabListener, SupervisorService.Callback {
     private static final String TAG = MainActivity.class.getSimpleName();
 
+    // platform's supervisor
     private ServiceConnection mSupervisorConnection;
     private SupervisorService mSupervisor;
 
@@ -75,7 +79,7 @@ public class MainActivity extends ActionBarActivity implements android.support.v
 
 
     /**
-     * UI TABS
+     * Configure UI tabs : policy, applications, protocols, neighbors, and packets.
      */
     private void configureTabs(){
         // get tab adapter

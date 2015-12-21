@@ -10,6 +10,8 @@ import java.util.Set;
 import ul.fcul.lasige.find.data.FullContract;
 
 /**
+ * Representation of a packet for UI usage.
+ *
  * Created by hugonicolau on 19/11/15.
  */
 public class PacketViewModel {

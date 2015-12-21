@@ -11,6 +11,9 @@ import android.widget.RelativeLayout;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Custom relative layout (view) that is checkable.
+ */
 public class CheckableRelativeLayout extends RelativeLayout implements Checkable {
     private boolean mIsChecked;
     private final List<Checkable> mCheckableViews = new ArrayList<>();

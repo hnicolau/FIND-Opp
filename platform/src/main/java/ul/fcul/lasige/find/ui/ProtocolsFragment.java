@@ -14,11 +14,15 @@ import ul.fcul.lasige.find.data.DbController;
 import ul.fcul.lasige.find.data.FullContract;
 
 /**
+ * Fragment that shows the platform's registered protocols.
+ *
  * Created by hugonicolau on 04/11/2015.
  */
 public class ProtocolsFragment extends Fragment {
 
+    // data cursor adapter
     private SimpleCursorAdapter mAdapter;
+    // database controller
     private DbController mDbController;
 
     @Override
@@ -36,9 +40,10 @@ public class ProtocolsFragment extends Fragment {
         int[] to = { android.R.id.text1 };
         String[] from = { FullContract.Protocols.COLUMN_IDENTIFIER };
 
+        // create adapter
         mAdapter = new SimpleCursorAdapter(getActivity(), layout, cursor, from, to, 0);
 
-        // set adapter
+        // set adapter and populate view
         ListView listView = (ListView) view.findViewById(R.id.protocolslistview);
         listView.setAdapter(mAdapter);
 

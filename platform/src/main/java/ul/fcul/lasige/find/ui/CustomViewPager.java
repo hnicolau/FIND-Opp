@@ -6,6 +6,9 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 
 /**
+ * Class extends from {@link ViewPager} and allows the user to navigate from a list of pages. By default
+ * users can't swipe to change views.
+ *
  * Created by hugonicolau on 09/10/15.
  */
 public class CustomViewPager extends ViewPager {
