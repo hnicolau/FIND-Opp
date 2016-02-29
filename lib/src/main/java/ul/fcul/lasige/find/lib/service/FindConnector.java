@@ -107,9 +107,11 @@ public class FindConnector implements Handler.Callback {
             Log.d(TAG, "Successfully bound with the FIND platform");
             mMessenger.setApiKey(TokenStore.getApiKey(mContext));
             // create new internet observer
-            mInternetObserver = new InternetObserver(callback);
-            mInternetObserver.register();
-            mMessenger.sendCommand(FindMessenger.MSG_INTERNET_CONNECTION); // request Internet status
+            if(callback!=null) {
+                mInternetObserver = new InternetObserver(callback);
+                mInternetObserver.register();
+                mMessenger.sendCommand(FindMessenger.MSG_INTERNET_CONNECTION); // request Internet status
+            }
         } else {
             Log.d(TAG, "Could not bind with the FIND platform");
             Toast.makeText(mContext, "The FIND platform is currently not installed.", Toast.LENGTH_SHORT).show();
@@ -131,7 +133,8 @@ public class FindConnector implements Handler.Callback {
             mMessenger.sendCommand(FindMessenger.MSG_UNREGISTER_CLIENT);
 
             // unregister internet observer
-            mInternetObserver.unregister();
+            if(mInternetObserver!=null)
+                mInternetObserver.unregister();
             // unregister packet observers
             for (PacketObserver observer : mPacketObservers.values()) {
                 observer.unregister();
@@ -229,7 +232,8 @@ public class FindConnector implements Handler.Callback {
      */
     public void requestStart() {
         if (mPlatformAvailable) {
-            mInternetObserver.register();
+            if(mInternetObserver!=null)
+                mInternetObserver.register();
             mMessenger.sendCommand(FindMessenger.MSG_START_PLATFORM);
         }
         else {
@@ -242,7 +246,8 @@ public class FindConnector implements Handler.Callback {
      */
     public void requestStop() {
         if (mPlatformAvailable) {
-            mInternetObserver.unregister();
+            if(mInternetObserver!=null)
+                mInternetObserver.unregister();
             mMessenger.sendCommand(FindMessenger.MSG_RELEASE_INTERNET);
             mMessenger.sendCommand(FindMessenger.MSG_STOP_PLATFORM);
         }
@@ -276,7 +281,6 @@ public class FindConnector implements Handler.Callback {
                 ApiKeyReceiver.requestApiKey(mContext);
                 break;
             }
-
             // protocol was successfully registered
             case FindMessenger.MSG_REGISTER_PROTOCOL: {
                 Log.d(TAG, "Received from FIND service [MSG_REGISTER_PROTOCOL]");
@@ -318,7 +322,8 @@ public class FindConnector implements Handler.Callback {
             // internet connection status
             case FindMessenger.MSG_INTERNET_CONNECTION: {
                 final int connected = msg.arg1;
-                mInternetObserver.onChange(connected == 1);
+                if(mInternetObserver!=null)
+                    mInternetObserver.onChange(connected == 1);
                 break;
             }
             default: {
@@ -529,6 +534,7 @@ public class FindConnector implements Handler.Callback {
             final Packet packet = Packet.fromCursor(cursor);
             list.add(packet);
         }
+
         return list;
     }
 
@@ -566,6 +572,11 @@ public class FindConnector implements Handler.Callback {
         else {
             Log.d(TAG, "FIND platform not available. Make sure it is installed.");
         }
+    }
+
+    public void setMessengerKey(String apiKey){
+        mMessenger.setApiKey(apiKey);
+
     }
 
 }

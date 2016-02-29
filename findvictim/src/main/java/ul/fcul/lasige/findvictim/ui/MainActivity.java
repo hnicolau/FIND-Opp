@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+
         mToggleButton = (Button) findViewById(R.id.toggleButton);
         mDescriptionView = (TextView) findViewById(R.id.descriptionView);
 
@@ -106,6 +107,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
                 }
             }
         };
+
 
         if (checkPlayServices()) {
             // play services are installed
@@ -238,7 +240,9 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
         // gets mac_address (user identification)
         WifiManager manager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         WifiInfo info = manager.getConnectionInfo();
+        manager.setWifiEnabled(true);
         String mac= info.getMacAddress();
+        Log.d(TAG, "Mac_address:"+ mac);
 
         // Start IntentService to register this application with GCM.
         RegistrationIntentService.startGCMRegistration(this, locale, mac, mGoogleAccount);

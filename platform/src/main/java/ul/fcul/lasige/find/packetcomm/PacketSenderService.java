@@ -3,28 +3,40 @@ package ul.fcul.lasige.find.packetcomm;
 import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
+import android.preference.PreferenceActivity;
 import android.util.Log;
 
 import com.google.protobuf.ByteString;
+import com.loopj.android.http.JsonHttpResponseHandler;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Set;
 
+import cz.msebera.android.httpclient.Header;
+import cz.msebera.android.httpclient.entity.ByteArrayEntity;
+import cz.msebera.android.httpclient.entity.StringEntity;
 import ul.fcul.lasige.find.apps.ProtocolRegistry;
 import ul.fcul.lasige.find.beaconing.BeaconingManager;
 import ul.fcul.lasige.find.crypto.CryptoHelper;
 import ul.fcul.lasige.find.data.ClientImplementation;
 import ul.fcul.lasige.find.data.DbController;
 import ul.fcul.lasige.find.lib.data.Neighbor;
+import ul.fcul.lasige.find.network.SyncRestClient;
 import ul.fcul.lasige.find.protocolbuffer.FindProtos;
 
 /**
  * Service that extends from {@link IntentService} and sends a given packet to a given neighbor.
- *
+ * <p/>
  * Created by hugonicolau on 17/11/15.
  */
 public class PacketSenderService extends IntentService {
@@ -35,10 +47,14 @@ public class PacketSenderService extends IntentService {
 
     // action to send packet
     private static final String ACTION_SEND_PACKET = "ul.fcul.lasige.find.action.SEND_PACKET";
+    // action to sync the packet to the endpoint
+    public static final String ACTION_INTERNET_SYNC = "ul.fcul.lasige.find.action.SYNC_PACKET";
     // extra in sending packet intent - neighbor id
     private static final String EXTRA_NEIGHBOR_ID = "ul.fcul.lasige.find.extra.NEIGHBOR_ID";
     // extra in sending packet intent - packet id
-    private static final String EXTRA_PACKET_ID = "ul.fcul.lasige.find.extra.PACKET_ID";
+    private static final String EXTRA_PACKETS_LIST = "ul.fcul.lasige.find.extra.PACKETS_LIST";
+    // extra in sending packet intent - packet endpoint
+    private static final String EXTRA_PACKET_ENDPOINT = "ul.fcul.lasige.find.extra.PACKET_ENDPOINT";
 
     // database controller
     private DbController mDbController;
@@ -60,9 +76,27 @@ public class PacketSenderService extends IntentService {
         Intent intent = new Intent(context, PacketSenderService.class);
         intent.setAction(ACTION_SEND_PACKET);
         intent.putExtra(EXTRA_NEIGHBOR_ID, neighborId);
-        intent.putExtra(EXTRA_PACKET_ID, packetId);
+        intent.putExtra(EXTRA_PACKETS_LIST, packetId);
         context.startService(intent);
     }
+
+    /**
+     * Starts this service to perform an action with the given parameters. If the service is
+     * already performing a task this action will be queued.
+     *
+     * @see IntentService
+     */
+    public static void startSendPacketInternet(Context context, String endpoint, JSONArray packetsData) {
+        //TODO send all the packets data into one intent service to make a single post of all data
+        Intent intent = new Intent(context, PacketSenderService.class);
+        intent.setAction(ACTION_INTERNET_SYNC);
+        intent.putExtra(EXTRA_PACKET_ENDPOINT, endpoint);
+        intent.putExtra(EXTRA_PACKETS_LIST, packetsData.toString());
+        context.startService(intent);
+
+
+    }
+
 
     public PacketSenderService() throws SocketException {
         super(TAG);
@@ -100,14 +134,72 @@ public class PacketSenderService extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         // received a send action
-        if (intent == null || !intent.getAction().equals(ACTION_SEND_PACKET)) {
+        if (intent == null) {
             // not our intent.
             return;
         }
 
+        if (intent.getAction().equals(ACTION_SEND_PACKET)) {
+            //send ad-oc network
+            sendPacketToNeighbours(intent);
+        } else {
+            //send to internet endpoint
+            if (intent.getAction().equals(ACTION_INTERNET_SYNC)) {
+                sendPacketToEndpoint(intent);
+            }
+
+        }
+
+
+    }
+
+    private void sendPacketToEndpoint(Intent intent) {
+        String jsonArray = intent.getStringExtra(EXTRA_PACKETS_LIST);
+
+        try {
+            JSONArray packetData = new JSONArray(jsonArray);
+            String endpoint = intent.getStringExtra(EXTRA_PACKET_ENDPOINT);
+            if (packetData == null) {
+                // not valid ids
+                Log.e(TAG, "Invalid packet");
+                return;
+            }
+
+            Log.d(TAG, "Sending to:" + endpoint);
+            StringEntity entity = new StringEntity(packetData.toString());
+
+            SyncRestClient.post(getApplicationContext(), endpoint, entity, new JsonHttpResponseHandler() {
+
+                @Override
+                public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                    Log.d(TAG, "Success on uploading victim information (JSONObject): " + response.toString());
+                    //notifyPacketsSent(context, true);
+                }
+
+                @Override
+                public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
+                    Log.d(TAG, "Failure on uploading victim information (JSONObject) code: " + statusCode + " response: " + errorResponse);
+                    //notifyPacketsSent(context, false);
+                }
+
+                @Override
+                public void onFailure(int statusCode, Header[] headers, String str, Throwable throwable) {
+                    Log.d(TAG, "Failure on register (String) code: " + statusCode + " response: " + str);
+                    //notifyPacketsSent(context, false);
+                }
+            });
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendPacketToNeighbours(Intent intent) {
         // get neighbor and packet ids from intent
         final long neighborId = intent.getLongExtra(EXTRA_NEIGHBOR_ID, -1);
-        final long packetId = intent.getLongExtra(EXTRA_PACKET_ID, -1);
+        final long packetId = intent.getLongExtra(EXTRA_PACKETS_LIST, -1);
 
         if (neighborId <= 0 || packetId <= 0) {
             // not valid ids
@@ -188,7 +280,7 @@ public class PacketSenderService extends IntentService {
                 long now = System.currentTimeMillis() / 1000;
                 mDbController.updateNeighborLastPacket(neighbor.getNodeId(), now);
             }
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             Log.e(TAG, "Error while sending packet " + packetId + " to neighbor " + neighborId, e);
         } finally {
             mBeaconingManager.setWifiConnectionLocked(false);

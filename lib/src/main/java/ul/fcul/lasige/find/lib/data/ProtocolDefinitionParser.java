@@ -99,6 +99,12 @@ public class ProtocolDefinitionParser {
                         Log.v(TAG, "\tauthenticated: " + isAuthenticated);
                         break;
                     }
+                    case "endpoint": {
+                        protocolDefinition.putString(
+                                FindContract.Protocols.COLUMN_ENDPOINT, content);
+                        Log.v(TAG, "\tendpoint: " + content);
+                        break;
+                    }
 
                     case "defaultTTL": {
                         int ttl = Integer.parseInt(content);

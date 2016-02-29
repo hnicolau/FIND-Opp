@@ -27,6 +27,7 @@ public class ClientImplementation {
     private final byte[] mProtocolHash;
     private final String mProtocolName;
     private final boolean mIsEncrypted;
+    private final String mEndpoint;
     private final boolean mIsSigned;
     private final int mDefaultTtl;
 
@@ -35,7 +36,7 @@ public class ClientImplementation {
     private final String mDisplayName;
 
     private ClientImplementation(String token, String packageName, String protocolName,
-                                 byte[] protocolHash, boolean isEncrypted, boolean isSigned,
+                                 byte[] protocolHash, boolean isEncrypted, boolean isSigned, String endpoint,
                                  Integer defaultTtl, byte[] identity, String displayName) {
         mToken = token;
 
@@ -44,6 +45,7 @@ public class ClientImplementation {
         mProtocolHash = protocolHash;
         mProtocolName = protocolName;
         mIsEncrypted = isEncrypted;
+        mEndpoint = endpoint;
         mIsSigned = isSigned;
         mDefaultTtl = defaultTtl;
 
@@ -67,6 +69,8 @@ public class ClientImplementation {
                 cursor.getColumnIndexOrThrow(FullContract.Protocols.COLUMN_IDENTIFIER_HASH));
         final int encrypted = cursor.getInt(
                 cursor.getColumnIndexOrThrow(FullContract.Protocols.COLUMN_ENCRYPTED));
+        final String endpoint = cursor.getString(
+                cursor.getColumnIndexOrThrow(FullContract.Protocols.COLUMN_ENDPOINT));
         final int signed = cursor.getInt(
                 cursor.getColumnIndexOrThrow(FullContract.Protocols.COLUMN_SIGNED));
         final byte[] identity = cursor.getBlob(
@@ -80,7 +84,7 @@ public class ClientImplementation {
         }
 
         return new ClientImplementation(token, packageName, protocolName,
-                protocolHash, encrypted > 0, signed > 0, ttl, identity, displayName);
+                protocolHash, encrypted > 0, signed > 0, endpoint, ttl, identity, displayName);
     }
 
     /**
@@ -129,6 +133,14 @@ public class ClientImplementation {
      */
     public boolean isEncrypted() {
         return mIsEncrypted;
+    }
+
+    /**
+     * Returns  protocol's messages endpoint
+     * @return endpoint.
+     */
+    public String endpoint() {
+        return mEndpoint;
     }
 
     /**

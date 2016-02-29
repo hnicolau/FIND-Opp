@@ -100,6 +100,13 @@ public class FindContract {
         public static final String COLUMN_ENCRYPTED = "encrypted";
 
         /**
+         * If packets have a endpoint destination null by default (.
+         * <p>
+         * Type: BOOLEAN (as INTEGER)
+         */
+        public static final String COLUMN_ENDPOINT= "endpoint";
+
+        /**
          * If packets should be signed by default (leveraging the own public key). Turn this off to
          * enable incognito operation (no sender node will be set).
          * <p>
@@ -121,7 +128,7 @@ public class FindContract {
          */
         public static final String[] PROJECTION_DEFAULT =
                 {
-                        _ID, COLUMN_IDENTIFIER, COLUMN_ENCRYPTED, COLUMN_SIGNED, COLUMN_DEFAULT_TTL
+                        _ID, COLUMN_IDENTIFIER, COLUMN_ENCRYPTED, COLUMN_ENDPOINT, COLUMN_SIGNED, COLUMN_DEFAULT_TTL
                 };
 
         /**
@@ -252,7 +259,7 @@ public class FindContract {
          */
         public static final String[] PROJECTION_DEFAULT_INCOMING =
                 {
-                        _ID, COLUMN_SOURCE_NODE, COLUMN_DATA, COLUMN_TIME_RECEIVED
+                        _ID, COLUMN_SOURCE_NODE,COLUMN_PROTOCOL, COLUMN_DATA, COLUMN_TIME_RECEIVED
                 };
 
         /**

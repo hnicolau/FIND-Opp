@@ -254,8 +254,22 @@ public class PacketRegistry {
      * @return Outgoing packets' ids.
      */
     // TODO use outgoing map instead of access DB similarly to getInterestingPacketIds
-    public Set<Long> getPacketsIdsSince(long timestamp) {
+    public Set<Long> getOutgoingPacketsIdsSince(long timestamp) {
         Cursor cursor = mDbController.getOutgoingPackets(timestamp);
+        Set<Long> ids = new HashSet<>();
+        while (cursor.moveToNext()) {
+            ids.add(Packet.fromCursor(cursor).getPacketId());
+        }
+        return ids;
+    }
+
+    /**
+     * Retrieves all  packets' ids existing in the platform since a given timestamp.
+     * @param timestamp Timestamp.
+     * @return Outgoing packets' ids.
+     */
+    public Set<Long> getAllPacketsIdsSince(long timestamp) {
+        Cursor cursor = mDbController.getAllPackets(timestamp);
         Set<Long> ids = new HashSet<>();
         while (cursor.moveToNext()) {
             ids.add(Packet.fromCursor(cursor).getPacketId());

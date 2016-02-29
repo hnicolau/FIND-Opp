@@ -107,6 +107,7 @@ public class ConnectorService extends Service
      */
     @Override
     public void onInternetConnection(boolean connected) {
+
         // notify all connected clients
         for (String clientApiKey : mConnectedClients.keySet()) {
             reply(clientApiKey, FindMessenger.MSG_INTERNET_CONNECTION, connected);
@@ -131,6 +132,7 @@ public class ConnectorService extends Service
         if (apiKey == null) {
             // this service does not work without API keys
             // give a chance for client app to request api key
+            Log.d(TAG, "API null while:" + msg.what);
             tryReplyToLetClientRequestApiKey(msg.replyTo);
             return true;
         } else {
@@ -219,7 +221,7 @@ public class ConnectorService extends Service
             case FindMessenger.MSG_INTERNET_CONNECTION: {
                 Log.d(TAG, "client requested internet state");
                 // reply whether we currently have internet access
-                reply(apiKey, FindMessenger.MSG_INTERNET_CONNECTION, mSupervisor.getBeaconingManager().hasInternetAccess());
+                    reply(apiKey, FindMessenger.MSG_INTERNET_CONNECTION, mSupervisor.getBeaconingManager().hasInternetAccess());
             }
             default: {
                 Log.d(TAG, "received an unrecognized message");

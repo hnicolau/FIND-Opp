@@ -16,6 +16,7 @@ import android.util.Log;
 
 import com.google.protobuf.ByteString;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -343,6 +344,7 @@ public class DbController {
                             values.getString(FullContract.Protocols.COLUMN_IDENTIFIER),
                             values.getBoolean(FullContract.Protocols.COLUMN_ENCRYPTED),
                             values.getBoolean(FullContract.Protocols.COLUMN_SIGNED),
+                            values.getString(FullContract.Protocols.COLUMN_ENDPOINT),
                             values.getInt(FullContract.Protocols.COLUMN_DEFAULT_TTL));
                 }
 
@@ -404,6 +406,36 @@ public class DbController {
     }
 
     /**
+     * Protocols
+     */
+    /**
+     * Returns protocol's DB id given its name.
+     * @param hashcode Protocol name.
+     * @return Protocol's DB id. -1 if it does not exists.
+     */
+    public Cursor getProtocolEndpointByHash(byte [] hashcode) {
+        // get read access
+        final SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+        // protocol hash
+        final Cursor allProtocolCursor = db.query(
+                FullContract.Protocols.TABLE_NAME,
+                null,null,
+                null, null, null, null, null);
+
+        while (allProtocolCursor.moveToNext()) {
+           byte []hash = allProtocolCursor.getBlob(2);
+            if(Arrays.equals(hash,hashcode)){
+                return allProtocolCursor;
+            }
+
+        }
+       return null;
+    }
+
+
+
+    /**
      * Insert protocol.
      * @param name Protocol name.
      * @param encrypted Is encrypted?
@@ -411,7 +443,7 @@ public class DbController {
      * @param defaultTtl Time to live.
      * @return The row id of the newly inserted row, or -1 if an error occurred.
      */
-    private long insertProtocol(String name, Boolean encrypted, Boolean authenticated, Integer defaultTtl) {
+    private long insertProtocol(String name, Boolean encrypted, Boolean authenticated, String endpoint, Integer defaultTtl) {
         // build values structure
         final ContentValues values = new ContentValues();
         // name
@@ -426,6 +458,10 @@ public class DbController {
         // authenticated?
         if (authenticated != null) {
             values.put(FullContract.Protocols.COLUMN_SIGNED, authenticated);
+        }
+        // endpoint
+        if (endpoint != null) {
+            values.put(FullContract.Protocols.COLUMN_ENDPOINT, endpoint);
         }
         // ttl
         if (defaultTtl != null) {
@@ -591,6 +627,22 @@ public class DbController {
                 String.format(Packets.WHERE_CLAUSE_TIME_RECEIVED, sinceTimestamp),
                 null, null, null,
                 Packets.SORT_ORDER_DEFAULT);
+    }
+
+    /**
+     * Retrieves a data cursor with all  packets that were inserted since a given timestamp.
+     * @param sinceTimestamp Timestamp.
+     * @return A data cursor.
+     * @see Cursor
+     */
+    public Cursor getAllPackets(long sinceTimestamp) {
+        final SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+        return db.query(
+                Packets.TABLE_NAME,
+                null,
+                String.format(Packets.WHERE_CLAUSE_TIME_RECEIVED, sinceTimestamp),
+                null, null, null,null);
     }
 
     /**
@@ -769,25 +821,56 @@ public class DbController {
     }
 
     /**
-     * Delete packets where TTL is lower than a given timestamp.
+     * Delete packets where TTL is lower than a given timestamp  that were already synchronized
      * @param expirationTimestamp Timestamp
      * @return Number of deleted packets.
      */
     public int deleteExpiredPackets(long expirationTimestamp) {
         // TODO: clean up queues for android < 4.0 (e.g. select first, then batch-delete)
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        int expired=0;
         try {
+            Log.d(TAG, "Deleting expired:" + expirationTimestamp);
             // packets in queues are also deleted; queues are just views associated with Packets table
-            return db.delete(Packets.TABLE_NAME,
-                    Packets.WHERE_CLAUSE_EXPIRED,
-                    new String[]{
-                            String.valueOf(expirationTimestamp)
-                    });
+            expired = db.delete(Packets.TABLE_NAME,
+                   Packets.COLUMN_TTL + "<="+ expirationTimestamp +" AND " +  Packets.WHERE_CLAUSE_SYNCHRONIZED, null
+                    );
         } finally {
             // notify content resolvers
             mContext.getContentResolver().notifyChange(Packets.URI_ALL, null);
+            return expired;
         }
     }
+
+    /**
+     * Delete packets where TTL is lower than a given timestamp from the outgoing view
+     * @param expirationTimestamp Timestamp
+     * @return Number of deleted packets.
+     */
+    public void updateOutgoingView(long expirationTimestamp) {
+        final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        int expired=0;
+        try {
+
+            //get all expired packets and remove them from the package ongoing queue
+           Cursor cursor = db.query(Packets.VIEW_NAME_OUTGOING,
+                    new String []{Packets._ID}, Packets.COLUMN_TTL  +"<=" + (System.currentTimeMillis()/1000), null, null, null, null);
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                int idExpired = cursor.getInt(0);
+                cursor.moveToNext();
+                db.delete(PacketQueues.TABLE_NAME,PacketQueues.COLUMN_PACKET_ID +" = "+ idExpired,null);
+            }
+            cursor.close();
+            //update the outgoing view
+            db.execSQL(FullContract.Packets.SQL_DROP_VIEW_OUTGOING);
+            db.execSQL(FullContract.Packets.SQL_CREATE_VIEW_OUTGOING);
+        } finally {
+            // notify content resolvers
+            mContext.getContentResolver().notifyChange(Packets.URI_OUTGOING, null);
+        }
+    }
+
 
     /*
      * Neighbors

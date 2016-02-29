@@ -88,6 +88,8 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL(FullContract.Packets.SQL_CREATE_VIEW_INCOMING);
             db.execSQL(FullContract.Packets.SQL_CREATE_VIEW_OUTGOING);
 
+
+
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();

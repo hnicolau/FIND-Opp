@@ -4,6 +4,7 @@
         <name>ul.fcul.lasige.find.sample</name>
         <encrypted>true</encrypted>
         <authenticated>true</authenticated>
+        <endpoint>http://doesntmatter</endpoint>
         <defaultTTL>3600</defaultTTL>
     </protocol>
 </protocols>

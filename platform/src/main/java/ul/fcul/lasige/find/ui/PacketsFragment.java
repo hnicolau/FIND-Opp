@@ -119,6 +119,7 @@ public class PacketsFragment extends Fragment {
 
             mList.clear();
             mList = buildListFromCursor(newCursor);
+            newCursor.close();
             notifyDataSetChanged();
         }
 

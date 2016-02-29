@@ -31,6 +31,7 @@ import ul.fcul.lasige.find.network.NetworkManager;
 import ul.fcul.lasige.find.network.NetworkStateChangeReceiver;
 import ul.fcul.lasige.find.packetcomm.PacketCommManager;
 import ul.fcul.lasige.find.protocolbuffer.FindProtos;
+import ul.fcul.lasige.find.service.SynchronizedPackets;
 import ul.fcul.lasige.find.utils.InterruptibleFailsafeRunnable;
 
 /**
@@ -66,7 +67,7 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
             InetAddresses.forString("224.0.0.251"), InetAddresses.forString("ff02::fb")
     };*/
 
-    protected static final int RECEIVER_SOCKET_TIMEOUT = 5 * 1000; // 5 seconds
+    protected static final int RECEIVER_SOCKET_TIMEOUT = 25 * 1000; // 25 seconds
     protected static final int RECEIVER_BUFFER_SIZE = 4 * 1024; // 4 KiB
 
     protected static final String SDP_NAME = "FindBeaconingManager";
@@ -175,10 +176,13 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     public void removeInternetCallback(InternetCallback internetCallback) { mInternetCallbacks.remove(internetCallback); }
 
     /**
-     * Notifies all Internet callbacks.
+     * Starts the default synchronization to endpoints and notifies all Internet callbacks.
      * @param connected Connectivity status.
      */
     private void notifyInternetCallbacks(boolean connected) {
+        if(connected)
+            SynchronizedPackets.syncPackets(mContext);
+
         for (InternetCallback callback : mInternetCallbacks) {
             callback.onInternetConnection(connected);
         }

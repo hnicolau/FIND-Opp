@@ -5,6 +5,7 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Handler;
+import android.util.Log;
 
 import com.google.common.base.Objects;
 
@@ -19,6 +20,9 @@ import java.util.List;
  * @see ContentObserver
  */
 public class PacketObserver extends ContentObserver {
+    private static final String TAG = InternetObserver.class.getSimpleName();
+
+
     // context of client app
     private final Context mContext;
     // URI incoming packets
@@ -143,7 +147,7 @@ public class PacketObserver extends ContentObserver {
      */
     public List<Packet> getPacketsSince(long timestamp) {
         final ArrayList<Packet> newPackets = new ArrayList<>();
-
+        Log.d(TAG, "URI BEFORE EEROR:" + mObservedUri.toString());
         // call Platform.data.FindProvider
         final Cursor newPacketsCursor = mContext.getContentResolver().query(
                 mObservedUri,
@@ -155,7 +159,7 @@ public class PacketObserver extends ContentObserver {
         while (newPacketsCursor.moveToNext()) {
             newPackets.add(Packet.fromCursor(newPacketsCursor));
         }
-
+        //newPacketsCursor.close();
         return newPackets;
     }
 

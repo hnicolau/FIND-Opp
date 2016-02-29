@@ -372,6 +372,7 @@ public class FindProvider extends ContentProvider {
                 break;
             }
 
+
             default: {
                 // Something which should not be queried remotely.
                 return null;

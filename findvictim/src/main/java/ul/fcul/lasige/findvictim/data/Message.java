@@ -1,6 +1,10 @@
 package ul.fcul.lasige.findvictim.data;
 
+import android.content.Context;
 import android.util.Log;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -97,5 +101,46 @@ public class Message implements Serializable{
         }
 
         return msg;
+    }
+
+    public  JSONObject getJSON() {
+        JSONObject json = new JSONObject();
+
+        try {
+            json.put("nodeid", OriginMac);
+            json.put("timestamp",TimeSent);
+            json.put("latitude", LocationLatitude);
+            json.put("longitude", LocationLongitude);
+            json.put("accuracy", LocationAccuracy);
+            json.put("locationTimestamp", LocationTimestamp);
+            json.put("battery", Battery);
+            json.put("steps", 0); // TODO
+            json.put("screen", 0); // TODO
+            json.put("safe", 0); // TODO
+            json.put("msg", ""); // TODO
+            /*json.put("status", ""); // deprecated
+            json.put("statusTimestamp", 0); // deprecated
+            json.put("origin", message.OriginMac);
+            json.put("target", ""); // deprecated
+            json.put("targetLatitude", 0); // deprecated
+            json.put("targetLongitude", 0); // deprecated
+            json.put("targetRadius", 0); // deprecated*/
+
+        } catch(JSONException e) {
+            return null;
+        }
+        return json;
+    }
+
+    public static  JSONObject createJSONByteData(String byteData) {
+        JSONObject json = new JSONObject();
+
+        try {
+            json.put("data", byteData);
+
+        } catch(JSONException e) {
+            return null;
+        }
+        return json;
     }
 }

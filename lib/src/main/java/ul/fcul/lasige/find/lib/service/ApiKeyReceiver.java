@@ -34,7 +34,7 @@ public class ApiKeyReceiver extends BroadcastReceiver{
      * @see IntentService
      */
     public static void requestApiKey(Context context) {
-        Log.d(TAG, "Going to broadcast ACTION_ISSUE_API_KEY");
+        Log.d(TAG, "Going to broadcast ACTION_ISSUE_API_KEY VICTIM");
         final Intent intent = new Intent(ACTION_ISSUE_API_KEY);
         intent.putExtra(EXTRA_APP_NAME, context.getPackageName());
         intent.setPackage(FindConnector.FIND_PACKAGE);
@@ -51,12 +51,14 @@ public class ApiKeyReceiver extends BroadcastReceiver{
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent != null && intent.getAction().equals(ACTION_ISSUE_API_KEY)) {
-            Log.d(TAG, "Received ACTION_ISSUE_API_KEY");
             // get token
             final String apiKey = intent.getStringExtra(EXTRA_API_KEY);
             if (apiKey != null) {
+                Log.d(TAG, "Received ACTION_ISSUE_API_KEY TOKEN");
+
                 // save token
                 TokenStore.saveApiKey(context, apiKey);
+               FindConnector.getInstance(context).setMessengerKey(apiKey);
             }
         }
     }

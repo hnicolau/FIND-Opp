@@ -34,5 +34,6 @@ dependencies {
     //compile 'com.google.protobuf:protobuf-java:2.5.0'
     compile 'com.android.support:appcompat-v7:23.1.0'
     compile project(':lib')
-
+    compile 'com.loopj.android:android-async-http:1.4.9'
+    compile 'com.google.android.gms:play-services-basement:8.3.0'
 }

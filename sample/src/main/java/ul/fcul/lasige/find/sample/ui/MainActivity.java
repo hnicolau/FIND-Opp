@@ -217,7 +217,7 @@ public class MainActivity extends AppCompatActivity implements PacketObserver.Pa
         if(connected) {
             Log.d(TAG, "Acquiring lock");
             // example on how to attempt to acquire internet lock from platform
-            mConnector.acquireInternetLock();
+          /*  mConnector.acquireInternetLock();
 
             new Thread(new Runnable() {
                 @Override
@@ -230,7 +230,7 @@ public class MainActivity extends AppCompatActivity implements PacketObserver.Pa
                         e.printStackTrace();
                     }
                 }
-            }).start();
+            }).start();*/
         }
     }
 }

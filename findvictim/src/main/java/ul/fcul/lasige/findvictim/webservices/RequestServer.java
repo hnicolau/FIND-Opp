@@ -3,6 +3,7 @@ package ul.fcul.lasige.findvictim.webservices;
 import android.content.Context;
 import android.content.Intent;
 import android.support.v4.content.LocalBroadcastManager;
+import android.util.Base64;
 import android.util.Log;
 
 import com.loopj.android.http.AsyncHttpResponseHandler;
@@ -24,7 +25,7 @@ import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.findvictim.data.Message;
 import ul.fcul.lasige.findvictim.data.TokenStore;
 import ul.fcul.lasige.findvictim.network.ConnectivityChangeReceiver;
-import ul.fcul.lasige.findvictim.utils.ServerUtils;
+import ul.fcul.lasige.findvictim.utils.DeviceUtils;
 
 /**
  * Created by hugonicolau on 30/11/15.
@@ -121,6 +122,8 @@ public class RequestServer {
             jsonParams.put("mac", mac);
             jsonParams.put("email", email);
             jsonParams.put("mode", mode); // legacy code
+            jsonParams.put("model", DeviceUtils.getDeviceName());
+            jsonParams.put("api_level", android.os.Build.VERSION.SDK_INT);
             StringEntity entity = new StringEntity(jsonParams.toString());
 
             SyncFindRestClient.post(context, method, entity, new JsonHttpResponseHandler() {
@@ -169,14 +172,19 @@ public class RequestServer {
         }
     }
 
-    public static void sendPackets(final Context context, ArrayList<Message> messages) {
+
+    //send messages
+    public static void sendPackets(final Context context, String [] messages) {
+
         Log.d(TAG, "Going to send packets from: " + TokenStore.getMacAddress(context));
+        Log.d(TAG, "Going to send packets with: " + TokenStore.getMacAddress(context));
+
         String method = "victims";
-        // build web service data - JSON
+
+        //build json array from packets
         JSONArray jsonArray = new JSONArray();
-        for(Message message : messages) {
-            JSONObject jsonMessage = ServerUtils.buildJSONFromMessage(context, message);
-            jsonArray.put(jsonMessage);
+        for(String message : messages) {
+            jsonArray.put(Message.createJSONByteData(message));
         }
 
         try {

@@ -128,7 +128,8 @@ public class NetworkStateChangeReceiver extends SafeBroadcastReceiver {
                 if (INTERESTING_AP_STATES.contains(currentState)) {
                     // enabled or disabling
                     final boolean isActivated = (currentState == ApState.ENABLED);
-                    for (NetworkChangeListener callback : mCallbacks) {
+                    if(mCallbacks!=null)
+                        for (NetworkChangeListener callback : mCallbacks) {
                         // notify listeners of ap mode change
                         callback.onAccessPointModeChanged(isActivated);
                     }

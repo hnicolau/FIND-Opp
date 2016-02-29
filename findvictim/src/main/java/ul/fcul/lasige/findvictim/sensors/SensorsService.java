@@ -15,6 +15,7 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.content.LocalBroadcastManager;
+import android.util.Base64;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -23,6 +24,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -52,7 +54,7 @@ import ul.fcul.lasige.findvictim.webservices.RequestServer;
  * Created by hugonicolau on 26/11/15.
  */
 public class SensorsService extends Service implements PacketObserver.PacketCallback,
-        NeighborObserver.NeighborCallback, InternetObserver.InternetCallback {
+        NeighborObserver.NeighborCallback/*, InternetObserver.InternetCallback */{
     private static final String TAG = SensorsService.class.getSimpleName();
 
     // start action
@@ -86,15 +88,21 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     private BroadcastReceiver mUploadBroadcastReceiver;
     private boolean mHasInternet = false;
 
+    //boolean that allows the service to run even without alert.
+    private final boolean DEBUG = false;
+
     /*
      * EXTERNAL API
      */
+
     /**
      * Convenience method to start the supervisor service.
      *
      * @param context
      */
     public static void startSensorsService(Context context) {
+        Log.d(TAG, "ON START SENRSOR SERVICE");
+
         final Intent startIntent = new Intent(context, SensorsService.class);
         startIntent.setAction(ACTION_START);
         context.startService(startIntent);
@@ -105,13 +113,17 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         return context.bindService(bindIntent, connection, Context.BIND_AUTO_CREATE);
     }
 
-    public static interface Callback { public void onActivationStateChanged(boolean activated); }
+    public static interface Callback {
+        public void onActivationStateChanged(boolean activated);
+    }
 
     public void addCallback(Callback callback) {
         mCallbacks.add(callback);
     }
 
-    public void removeCallback(Callback callback) { mCallbacks.remove(callback); }
+    public void removeCallback(Callback callback) {
+        mCallbacks.remove(callback);
+    }
 
     private void notifyCallbacks(boolean activated) {
         for (Callback callback : mCallbacks) {
@@ -152,14 +164,21 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
             @Override
             public void onReceive(Context context, Intent intent) {
                 Log.d(TAG, "Finish uploading");
-                if(intent != null && intent.getAction().equals(RequestServer.ACTION_PACKETS_SENT)) {
+                if (intent != null && intent.getAction().equals(RequestServer.ACTION_PACKETS_SENT)) {
                     boolean success = intent.getBooleanExtra(RequestServer.EXTRA_PACKETS_SENT, false);
-                    if(success) {
+                    if (success) {
                         Log.d(TAG, "---------------- Packets sent! -----------------");
-                        if(mConnectivityReceiver != null) getApplicationContext().unregisterReceiver(mConnectivityReceiver);
-                    }
-                    else if(mHasInternet){
+                        if (mConnectivityReceiver != null) {
+                            try {
+                                getApplicationContext().unregisterReceiver(mConnectivityReceiver);
+                            } catch (IllegalArgumentException e) {
+                                Log.d(TAG, "mConnectivity Receiver not register");
+                            }
+
+                        }
+                    } else if (mHasInternet) {
                         // if fail keep trying while you have an internet connection, but release lock
+                        Log.d(TAG, "Sync has Internet ");
                         sync();
                     }
                     Log.d(TAG, "Released Internet LOCK");
@@ -188,7 +207,8 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         // quit thread
         mHandlerThread.quit();
 
-        if(mConnectivityReceiver != null) getApplicationContext().unregisterReceiver(mConnectivityReceiver);
+        if (mConnectivityReceiver != null)
+            getApplicationContext().unregisterReceiver(mConnectivityReceiver);
 
         LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(mUploadBroadcastReceiver);
 
@@ -224,7 +244,9 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         }
     }
 
-    public SensorManager getSensorManager() { return mSensorManager; }
+    public SensorManager getSensorManager() {
+        return mSensorManager;
+    }
 
     public void activateSensors() {
         if (!isActivated()) {
@@ -280,7 +302,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     private void bindToFind() {
         // FIND
         Log.d(TAG, "Trying to bind with FIND platform ...");
-        if (mConnector.bind(this)) {
+        if (mConnector.bind(null/*this*/)) {
             Log.d(TAG, "Bind was successful");
             mConnector.registerProtocolsFromResources(R.xml.protocols, this, this);
         }
@@ -309,6 +331,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     private void stopSensors() {
         Log.d(TAG, "Stopping sensors");
         mSensorManager.stopAllSensors();
+
     }
 
     private void startSendingMessages() {
@@ -316,7 +339,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         mAsyncExecutorService = Executors.newScheduledThreadPool(2);
         mAsyncExecutorService.scheduleAtFixedRate(
                 new MessageGenerator.GenerateMessageTask(getApplicationContext(), mSensorManager, this),
-                30, 30, TimeUnit.SECONDS);
+                30, 60, TimeUnit.SECONDS);
     }
 
     private void stopSendingMessages() {
@@ -332,15 +355,15 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         Log.d(TAG, "Location Lat: " + message.LocationLatitude + " Lon: " + message.LocationLongitude + " Acc: " + message.LocationAccuracy + " Time: " + message.LocationTimestamp);
 
         // if it is the first time we have location
-        if(TokenStore.isFirstLocation(getApplicationContext())) {
+        if (TokenStore.isFirstLocation(getApplicationContext()) && !DEBUG) {
             // if it is a valid location
-            if(message.LocationLongitude != 0 && message.LocationLatitude != 0) {
+            if (message.LocationLongitude != 0 && message.LocationLatitude != 0) {
                 // get current alert
                 Cursor cursor = Alert.Store.fetchAlerts(
                         DatabaseHelper.getInstance(getApplicationContext()).getReadableDatabase(),
                         Alert.STATUS.ONGOING);
 
-                if(!cursor.moveToFirst()) {
+                if (!cursor.moveToFirst()) {
                     // no current ongoing alerts, stop SensorsService
                     cursor.close();
                     scheduleStateTransition(SensorsState.IDLE);
@@ -349,11 +372,10 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
                 // check whether we are inside the alert area
                 Alert alert = Alert.fromCursor(cursor);
 
-                if(PositionUtils.isInLocation(message.LocationLatitude, message.LocationLongitude, alert.getLatStart(),
+                if (PositionUtils.isInLocation(message.LocationLatitude, message.LocationLongitude, alert.getLatStart(),
                         alert.getLonStart(), alert.getLatEnd(), alert.getLonEnd())) {
                     TokenStore.setIsFirstLocation(getApplicationContext(), false);
-                }
-                else {
+                } else {
                     // if not, then stop SensorsService
                     cursor.close();
                     scheduleStateTransition(SensorsState.IDLE);
@@ -367,17 +389,25 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         // if we reached this point it is because either: 1) we don't know our location or 2) we are inside the alert area
 
         // enqueue message to the communication platform
-        if(mConnector != null) {
+        if (mConnector != null) {
             // enqueue packet
-            mConnector.enqueuePacket(Message.serialize(message));
-            // try to connect to current neighbors
-            mConnector.requestDiscovery();
-            Log.d(TAG, "Enqueued message");
+            try {
+                mConnector.enqueuePacket(message.getJSON().toString().getBytes("UTF-8"));
 
-            // try to send to server
-            if(mHasInternet) sync();
-        }
-        else {
+                // try to connect to current neighbors
+                mConnector.requestDiscovery();
+                Log.d(TAG, "Enqueued message");
+
+               /* // try to send to server
+                if (mHasInternet){
+                    Log.d(TAG, "Sync has Internet on enqueu");
+                    //sync();
+                }*/
+
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+        } else {
             Log.d(TAG, "No longer connected to enqueue message");
         }
     }
@@ -396,7 +426,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         /**
          * The service is up and running, but doing nothing yet. From here, an activation
          * request is needed to transition further to the {@link SensorsState#RUNNING} state.
-         * <p>
+         * <p/>
          * This state is also transitioned to in case of a deactivation request.
          */
         IDLE {
@@ -411,7 +441,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         /**
          * The service is enabled and starts collecting sensor data. From here, a deactivation
          * request is needed to transition further to the {@link SensorsState#IDLE} state.
-         * <p>
+         * <p/>
          * When in this state, the supervisor holds a partial wake lock.
          *
          * @see PowerManager.WakeLock
@@ -428,12 +458,14 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
             @Override
             public void onLeave(SensorsService ss) {
+                Log.d(TAG, "THIS IS THE END");
                 ss.stopSendingMessages();
                 ss.stopSensors();
                 ss.stopFind();
                 ss.releaseWakeLock();
                 ss.syncWithServer();
                 ss.notifyCallbacks(false);
+
             }
         };
 
@@ -442,21 +474,24 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
          *
          * @param sv
          */
-        public void onEnter(SensorsService sv) { }
+        public void onEnter(SensorsService sv) {
+        }
 
         /**
          * Executes the main function of this state. By default, this method does nothing.
          *
          * @param sv
          */
-        public void execute(SensorsService sv) { }
+        public void execute(SensorsService sv) {
+        }
 
         /**
          * Executes when leaving this state. By default, this method does nothing.
          *
          * @param sv
          */
-        public void onLeave(SensorsService sv) { }
+        public void onLeave(SensorsService sv) {
+        }
 
         /**
          * Checks if this state can be transitioned to from the specified state. By default, this
@@ -493,17 +528,18 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
     }
 
-    @Override
+   /* @Override
     public void onInternetConnection(boolean connected) {
         Log.d(TAG, "----- OnInternetConnection: " + connected);
 
+
         mHasInternet = connected;
-        if(connected && isActivated()) {
-            // lock connection
+       if (connected && isActivated()) {
+           // lock connection
             mConnector.acquireInternetLock();
-            sync();
+           sync();
         }
-    }
+    }*/
 
     /*
      * INTERNET CONNECTION
@@ -516,11 +552,12 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
             public void run() {
 
                 // do we have an Internet connection?
-                if(NetworkUtils.isOnline(getApplicationContext())) {
+                if (NetworkUtils.isOnline(getApplicationContext())) {
                     // yes we do! sync ...
+                    Log.d(TAG, "Sync with server Internet ");
+
                     sync();
-                }
-                else {
+                } else {
                     // no, try again when connectivity changes
                     // register receiver
                     mConnectivityReceiver = new ConnectivityChangeReceiver(SensorsService.this);
@@ -539,13 +576,20 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
             public void run() {
                 // get all outgoing messages
                 ArrayList<Packet> packets = new ArrayList<Packet>(mConnector.getOutgoingPackets());
-                final ArrayList<Message> messages = new ArrayList<>();
-                for(Packet packet : packets) {
-                    final Message message = Message.deserialize(packet.getData());
-                    messages.add(message);
+                String[] messages = new String[packets.size()];
+                int index = 0;
+                for (Packet packet : packets) {
+                    String base64Encoded = Base64.encodeToString(packet.getData(), Base64.DEFAULT);
+                    messages[index] = base64Encoded;
+                    index++;
+                }
+                if (messages.length > 0) {
+                    RequestServer.sendPackets(getApplicationContext(), messages);
+                } else {
+                    Log.d(TAG, "No messages");
                 }
 
-                RequestServer.sendPackets(getApplicationContext(), messages);
+
             }
         }).start();
 

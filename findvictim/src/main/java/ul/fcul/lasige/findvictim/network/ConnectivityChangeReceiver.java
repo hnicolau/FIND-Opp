@@ -25,7 +25,7 @@ public class ConnectivityChangeReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(final Context context, final Intent intent) {
         Log.d(TAG, "Connectivity changed");
-        if(NetworkUtils.isOnline(context))
+        if(NetworkUtils.isOnline(context));
             mService.sync();
     }
 
