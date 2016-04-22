@@ -32,7 +32,6 @@ public class ScanResults {
         for (final WifiConfiguration network : configuredNetworks) {
             knownSSIDs.add(NetworkManager.unquoteSSID(network.SSID));
         }
-
         for (final ScanResult network : availableNetworks) {
             if (NetworkManager.isFindSSID(network.SSID)
                     || (NetworkManager.isOpenNetwork(network) && network.level > -90) // TODO open networks are not being used for now

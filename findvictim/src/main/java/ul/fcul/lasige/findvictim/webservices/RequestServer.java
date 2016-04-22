@@ -173,6 +173,9 @@ public class RequestServer {
     }
 
 
+
+
+
     //send messages
     public static void sendPackets(final Context context, String [] messages) {
 
@@ -187,7 +190,13 @@ public class RequestServer {
             jsonArray.put(Message.createJSONByteData(message));
         }
 
+
         try {
+            JSONObject senderMac = new JSONObject();
+            senderMac.put("syncMacAddress", TokenStore.getMacAddress(context));
+            senderMac.put("type", "sync");
+            jsonArray.put(senderMac);
+
             StringEntity entity = new StringEntity(jsonArray.toString());
 
             SyncFindRestClient.post(context, method, entity, new JsonHttpResponseHandler() {

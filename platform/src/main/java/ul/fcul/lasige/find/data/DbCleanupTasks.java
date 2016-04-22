@@ -36,7 +36,7 @@ public class DbCleanupTasks {
 
             // get current time in minutes
             final long currentTime = System.currentTimeMillis() / 1000;
-                Log.d(TAG, "Deleting counting");
+                Log.d(TAG, "Deleting counting ");
 
                 // delete expired packets from database that were already synchronized
                 final int deleteCount = dbController.deleteExpiredPackets(currentTime);
@@ -44,6 +44,9 @@ public class DbCleanupTasks {
 
                  //remove expire packets from the outgoing view
                  dbController.updateOutgoingView(currentTime);
+
+                //remove expire packets from the outgoing view
+                dbController.updateStaleView(currentTime);
 
                 Log.v(TAG, String.format("Deleted %d packets with a TTL lower than %d", deleteCount, currentTime));
 

@@ -83,7 +83,8 @@ public class FindMessenger implements ServiceConnection {
      *
      * @param newKey Key to be stored.
      */
-    protected void setApiKey(String newKey) { mApiKey = newKey; }
+    protected void setApiKey(String newKey) {
+        mApiKey = newKey; }
 
     /**
      * Send message to FIND service via IDL interface. No additional data is sent.
@@ -122,7 +123,7 @@ public class FindMessenger implements ServiceConnection {
         Message msg = Message.obtain();
         msg.what = msgCode;
         msg.setData(data);
-        msg.replyTo = replyTo;
+        msg.replyTo = mOwnMessenger;
 
         // lock access to queue
         synchronized (sMessageQueue) {

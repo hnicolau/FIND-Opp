@@ -188,6 +188,7 @@ public class FullContract {
                         + "P." + Protocols.COLUMN_IDENTIFIER_HASH + ", "
                         + "P." + Protocols.COLUMN_ENCRYPTED + ", "
                         + "P." + Protocols.COLUMN_ENDPOINT + ","
+                        + "P." + Protocols.COLUMN_DOWNLOAD_ENDPOINT + ","
                         + "P." + Protocols.COLUMN_SIGNED + ", "
                         + "P." + Protocols.COLUMN_DEFAULT_TTL + ", "
                         + "I." + Identities.COLUMN_PUBLICKEY + ", "
@@ -208,8 +209,8 @@ public class FullContract {
                 {
                         _ID, COLUMN_APP_ID, COLUMN_PROTOCOL_ID, COLUMN_TOKEN, Apps.COLUMN_PACKAGE_NAME,
                         Protocols.COLUMN_IDENTIFIER, Protocols.COLUMN_IDENTIFIER_HASH, Protocols.COLUMN_ENDPOINT,
-                        Protocols.COLUMN_ENCRYPTED, Protocols.COLUMN_SIGNED, Protocols.COLUMN_DEFAULT_TTL,
-                        Identities.COLUMN_PUBLICKEY, Identities.COLUMN_DISPLAY_NAME
+                        Protocols.COLUMN_DOWNLOAD_ENDPOINT, Protocols.COLUMN_ENCRYPTED, Protocols.COLUMN_SIGNED,
+                        Protocols.COLUMN_DEFAULT_TTL, Identities.COLUMN_PUBLICKEY, Identities.COLUMN_DISPLAY_NAME
                 };
 
         /**
@@ -270,9 +271,16 @@ public class FullContract {
         /**
          * If packets have a endpoint destination null by default (.
          * <p/>
-         * Type: BOOLEAN (as INTEGER)
+         * Type: TEXT
          */
         public static final String COLUMN_ENDPOINT = "endpoint";
+
+        /**
+         * If the protocol has a endpoint where the platform should retrieve data
+         * <p/>
+         * Type: TEXT
+         */
+        public static final String COLUMN_DOWNLOAD_ENDPOINT = "download_endpoint";
 
         /**
          * If packets should be signed by default (leveraging the own public key). Turn this off to
@@ -300,7 +308,8 @@ public class FullContract {
                         + COLUMN_IDENTIFIER + " text not null, "
                         + COLUMN_IDENTIFIER_HASH + " blob unique not null, "
                         + COLUMN_ENCRYPTED + " integer not null, "
-                        + COLUMN_ENDPOINT + " text not null, "
+                        + COLUMN_ENDPOINT + " text, "
+                        + COLUMN_DOWNLOAD_ENDPOINT + " text, "
                         + COLUMN_SIGNED + " integer not null, "
                         + COLUMN_DEFAULT_TTL + " integer)";
 
@@ -309,7 +318,7 @@ public class FullContract {
          */
         public static final String[] PROJECTION_DEFAULT =
                 {
-                        _ID, COLUMN_IDENTIFIER, COLUMN_ENCRYPTED, COLUMN_ENDPOINT, COLUMN_SIGNED, COLUMN_DEFAULT_TTL
+                        _ID, COLUMN_IDENTIFIER, COLUMN_ENCRYPTED, COLUMN_ENDPOINT,COLUMN_DOWNLOAD_ENDPOINT, COLUMN_SIGNED, COLUMN_DEFAULT_TTL
                 };
 
         /**
@@ -443,7 +452,7 @@ public class FullContract {
         /**
          * The name of the table view for expired stored packets.
          */
-        public static final String VIEW_NAME_STORAGE = "StoragePackets_View";
+        public static final String VIEW_NAME_STALE = "StalePackets_View";
 
 
         /**
@@ -643,6 +652,23 @@ public class FullContract {
                         + SQL_COMMON_COLUMNS
                         + SQL_JOIN_CONDITION;
 
+        public static final String SQL_CREATE_VIEW_STALE_PACKETS =
+                "create view " + VIEW_NAME_STALE + " as select "
+                        + _ID + ", "
+                        + COLUMN_SOURCE_NODE + ", "
+                        + COLUMN_PROTOCOL + ", "
+                        + COLUMN_DATA + ", "
+                        + COLUMN_SYNCHRONIZED + ", "
+                        + COLUMN_TIME_RECEIVED
+                        + " from " + TABLE_NAME
+                        + " where " + Packets.COLUMN_TTL + "<="+ (System.currentTimeMillis()/ 1000) +" AND " +  Packets.COLUMN_SYNCHRONIZED + "=0";
+
+        /**
+         * The SQL statement to drop the view on all outgoing packets (belonging to the OUTGOING
+         * or FORWARDING queue).
+         */
+        public static final String SQL_DROP_VIEW_STALE =
+                "drop view " + VIEW_NAME_STALE;
 
         /**
          * A projection of the default columns in the packets table.
@@ -739,8 +765,7 @@ public class FullContract {
         /**
          * CHECK constraint to ensure only valid values are written into the queue column.
          */
-        public static final String SQL_CHECK_CONSTRAINT =
-                DbHelper.buildCheckConstraint(COLUMN_QUEUE, PacketQueues.class);
+        public static final String SQL_CHECK_CONSTRAINT =DbHelper.buildCheckConstraint(COLUMN_QUEUE, PacketQueues.class);
 
         /**
          * Template for the SQL statement to create this table. In order to create this table, fill

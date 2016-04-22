@@ -80,6 +80,8 @@ public class PacketObserver extends ContentObserver {
      */
     @Override
     public void onChange(boolean selfChange) {
+        Log.d(TAG, "Received self Packect Update");
+
         onChange(selfChange, null);
     }
 
@@ -91,13 +93,18 @@ public class PacketObserver extends ContentObserver {
      */
     @Override
     public void onChange(boolean selfChange, Uri uri) {
+        Log.d(TAG, "Received Packect Update");
+
+        if(uri!=null)
+            Log.d(TAG, "Received Packect Update" + uri.toString());
         // get all packets since last one received; this is particularly useful if client app was
         // disconnected and the platform received new packets
         for (Packet packet : getPacketsSince(mTimeLastPacketReceived)) {
             // set timestamp to last packet received; Math.max is to guarantee we don't go back in time
             mTimeLastPacketReceived = Math.max(mTimeLastPacketReceived, packet.getTimeReceived());
             // notifies client app of new packet received
-            mCallback.onPacketReceived(packet);
+            mCallback.onPacketReceived(packet,uri);
+            //mCallback.onPacketReceived(packet);
         }
         // save last timestamp persistently
         TokenStore.saveLastPacketReceived(mContext, mTimeLastPacketReceived);
@@ -129,7 +136,8 @@ public class PacketObserver extends ContentObserver {
      * CALLBACK INTERFACE FOR FIND CLIENT
      */
     public static interface PacketCallback {
-        public void onPacketReceived(Packet packet);
+        //public void onPacketReceived(Packet packet);
+        public void onPacketReceived(Packet packet, Uri uri);
     }
 
     /*
@@ -147,7 +155,6 @@ public class PacketObserver extends ContentObserver {
      */
     public List<Packet> getPacketsSince(long timestamp) {
         final ArrayList<Packet> newPackets = new ArrayList<>();
-        Log.d(TAG, "URI BEFORE EEROR:" + mObservedUri.toString());
         // call Platform.data.FindProvider
         final Cursor newPacketsCursor = mContext.getContentResolver().query(
                 mObservedUri,
@@ -159,7 +166,7 @@ public class PacketObserver extends ContentObserver {
         while (newPacketsCursor.moveToNext()) {
             newPackets.add(Packet.fromCursor(newPacketsCursor));
         }
-        //newPacketsCursor.close();
+        newPacketsCursor.close();
         return newPackets;
     }
 

@@ -7,8 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.database.Cursor;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -18,22 +17,14 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.util.Base64;
 import android.util.Log;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import ul.fcul.lasige.find.lib.data.InternetObserver;
 import ul.fcul.lasige.find.lib.data.Neighbor;
 import ul.fcul.lasige.find.lib.data.NeighborObserver;
 import ul.fcul.lasige.find.lib.data.Packet;
@@ -49,12 +40,13 @@ import ul.fcul.lasige.findvictim.network.ConnectivityChangeReceiver;
 import ul.fcul.lasige.findvictim.utils.NetworkUtils;
 import ul.fcul.lasige.findvictim.utils.PositionUtils;
 import ul.fcul.lasige.findvictim.webservices.RequestServer;
+import ul.fcul.lasige.findvictim.webservices.WebLogging;
 
 /**
  * Created by hugonicolau on 26/11/15.
  */
 public class SensorsService extends Service implements PacketObserver.PacketCallback,
-        NeighborObserver.NeighborCallback/*, InternetObserver.InternetCallback */{
+        NeighborObserver.NeighborCallback/*, InternetObserver.InternetCallback */ {
     private static final String TAG = SensorsService.class.getSimpleName();
 
     // start action
@@ -89,7 +81,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     private boolean mHasInternet = false;
 
     //boolean that allows the service to run even without alert.
-    private final boolean DEBUG = false;
+    private boolean mManualStart = true;
 
     /*
      * EXTERNAL API
@@ -131,6 +123,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         }
     }
 
+
     /*
      * SERVICE
      */
@@ -149,7 +142,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         mWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FindSensorsWakeLock");
         mWakeLock.setReferenceCounted(false);
 
-        // get FIND platform connector
+        // get FIND platform connect
         mConnector = FindConnector.getInstance(this);
         // bind to platform
         bindToFind();
@@ -248,13 +241,17 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         return mSensorManager;
     }
 
-    public void activateSensors() {
+    public void activateSensors(boolean manualStart) {
+        mManualStart = manualStart;
         if (!isActivated()) {
+            WebLogging.logMessage(this, "started sensors", TokenStore.getMacAddress(this), "FindVictim");
             scheduleStateTransition(SensorsState.RUNNING);
         }
     }
 
     public void deactivateSensors() {
+        Log.v(TAG, "Deactivate  Sensors");
+
         if (isActivated()) {
             // clear scheduled state transitions and instead go to IDLE next
             mStateHandler.removeCallbacksAndMessages(null);
@@ -355,7 +352,8 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         Log.d(TAG, "Location Lat: " + message.LocationLatitude + " Lon: " + message.LocationLongitude + " Acc: " + message.LocationAccuracy + " Time: " + message.LocationTimestamp);
 
         // if it is the first time we have location
-        if (TokenStore.isFirstLocation(getApplicationContext()) && !DEBUG) {
+        if (TokenStore.isFirstLocation(getApplicationContext()) && !mManualStart) {
+
             // if it is a valid location
             if (message.LocationLongitude != 0 && message.LocationLatitude != 0) {
                 // get current alert
@@ -392,7 +390,8 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         if (mConnector != null) {
             // enqueue packet
             try {
-                mConnector.enqueuePacket(message.getJSON().toString().getBytes("UTF-8"));
+                String protocol = mConnector.getProtocolToken("ul.fcul.lasige.findvictim");
+                mConnector.enqueuePacket(protocol, message.getJSON().toString().getBytes("UTF-8"));
 
                 // try to connect to current neighbors
                 mConnector.requestDiscovery();
@@ -458,7 +457,6 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
             @Override
             public void onLeave(SensorsService ss) {
-                Log.d(TAG, "THIS IS THE END");
                 ss.stopSendingMessages();
                 ss.stopSensors();
                 ss.stopFind();
@@ -524,8 +522,17 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     }
 
     @Override
-    public void onPacketReceived(Packet packet) {
+    public void onPacketReceived(Packet packet, Uri ui) {
 
+        String downloadProtocol = mConnector.getProtocolToken("ul.fcul.lasige.downloading");
+        Log.d(TAG, "Download protocol:" + downloadProtocol);
+        Log.d(TAG, "Received token protocol:" + ui.getQueryParameters("protocol_token").get(0));
+
+        if (downloadProtocol.equals(ui.getQueryParameters("protocol_token").get(0))) {
+            //do something with packet
+            String data = new String(packet.getData());
+            Log.d(TAG, "Packet received:::" + data);
+        }
     }
 
    /* @Override
@@ -579,6 +586,8 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
                 String[] messages = new String[packets.size()];
                 int index = 0;
                 for (Packet packet : packets) {
+                    Log.d(TAG, "Synching; " + new String(packet.getData()));
+
                     String base64Encoded = Base64.encodeToString(packet.getData(), Base64.DEFAULT);
                     messages[index] = base64Encoded;
                     index++;

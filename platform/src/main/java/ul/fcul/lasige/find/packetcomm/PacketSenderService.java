@@ -3,6 +3,9 @@ package ul.fcul.lasige.find.packetcomm;
 import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.preference.PreferenceActivity;
 import android.util.Log;
 
@@ -33,6 +36,7 @@ import ul.fcul.lasige.find.data.DbController;
 import ul.fcul.lasige.find.lib.data.Neighbor;
 import ul.fcul.lasige.find.network.SyncRestClient;
 import ul.fcul.lasige.find.protocolbuffer.FindProtos;
+import ul.fcul.lasige.find.service.SynchronizedPackets;
 
 /**
  * Service that extends from {@link IntentService} and sends a given packet to a given neighbor.
@@ -55,6 +59,8 @@ public class PacketSenderService extends IntentService {
     private static final String EXTRA_PACKETS_LIST = "ul.fcul.lasige.find.extra.PACKETS_LIST";
     // extra in sending packet intent - packet endpoint
     private static final String EXTRA_PACKET_ENDPOINT = "ul.fcul.lasige.find.extra.PACKET_ENDPOINT";
+    // extra in sending packet intent - current update time
+    private static final String EXTRA_NEW_SYNC_TIME = "ul.fcul.lasige.find.extra.NEW_SYNC_TIMESTAMP";
 
     // database controller
     private DbController mDbController;
@@ -86,12 +92,12 @@ public class PacketSenderService extends IntentService {
      *
      * @see IntentService
      */
-    public static void startSendPacketInternet(Context context, String endpoint, JSONArray packetsData) {
-        //TODO send all the packets data into one intent service to make a single post of all data
+    public static void startSendPacketInternet(Context context,  String endpoint, JSONArray packetsData, long newUpdateTime) {
         Intent intent = new Intent(context, PacketSenderService.class);
         intent.setAction(ACTION_INTERNET_SYNC);
         intent.putExtra(EXTRA_PACKET_ENDPOINT, endpoint);
         intent.putExtra(EXTRA_PACKETS_LIST, packetsData.toString());
+        intent.putExtra(EXTRA_NEW_SYNC_TIME, newUpdateTime);
         context.startService(intent);
 
 
@@ -155,10 +161,21 @@ public class PacketSenderService extends IntentService {
 
     private void sendPacketToEndpoint(Intent intent) {
         String jsonArray = intent.getStringExtra(EXTRA_PACKETS_LIST);
+        final long newSyncTime = intent.getLongExtra(EXTRA_NEW_SYNC_TIME, 0);
+
+        WifiManager manager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        WifiInfo info = manager.getConnectionInfo();
+        manager.setWifiEnabled(true);
+        String mac= info.getMacAddress();
+        JSONObject senderMac = new JSONObject();
 
         try {
+            senderMac.put("syncMacAddress", mac);
+            senderMac.put("type", "platform");
+
             JSONArray packetData = new JSONArray(jsonArray);
-            String endpoint = intent.getStringExtra(EXTRA_PACKET_ENDPOINT);
+            packetData.put(senderMac);
+            final String  endpoint = intent.getStringExtra(EXTRA_PACKET_ENDPOINT);
             if (packetData == null) {
                 // not valid ids
                 Log.e(TAG, "Invalid packet");
@@ -166,6 +183,8 @@ public class PacketSenderService extends IntentService {
             }
 
             Log.d(TAG, "Sending to:" + endpoint);
+            Log.d(TAG, "Mac_address on synching:"+ packetData.toString());
+
             StringEntity entity = new StringEntity(packetData.toString());
 
             SyncRestClient.post(getApplicationContext(), endpoint, entity, new JsonHttpResponseHandler() {
@@ -173,19 +192,24 @@ public class PacketSenderService extends IntentService {
                 @Override
                 public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                     Log.d(TAG, "Success on uploading victim information (JSONObject): " + response.toString());
-                    //notifyPacketsSent(context, true);
+
+                    //mark messages that were already syncronyzed
+                    SynchronizedPackets.packetsSuccessfullySync(getApplicationContext(), newSyncTime);
+                    BeaconingManager.getInstance(getApplicationContext()).releaseInternetLock(endpoint);
+
                 }
 
                 @Override
                 public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
                     Log.d(TAG, "Failure on uploading victim information (JSONObject) code: " + statusCode + " response: " + errorResponse);
-                    //notifyPacketsSent(context, false);
+                    BeaconingManager.getInstance(getApplicationContext()).releaseInternetLock(endpoint);
+
                 }
 
                 @Override
                 public void onFailure(int statusCode, Header[] headers, String str, Throwable throwable) {
                     Log.d(TAG, "Failure on register (String) code: " + statusCode + " response: " + str);
-                    //notifyPacketsSent(context, false);
+                    BeaconingManager.getInstance(getApplicationContext()).releaseInternetLock(endpoint);
                 }
             });
 

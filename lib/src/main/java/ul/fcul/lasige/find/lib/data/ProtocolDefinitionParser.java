@@ -105,7 +105,12 @@ public class ProtocolDefinitionParser {
                         Log.v(TAG, "\tendpoint: " + content);
                         break;
                     }
-
+                    case "download_endpoint": {
+                        protocolDefinition.putString(
+                                FindContract.Protocols.COLUMN_DOWNLOAD_ENDPOINT, content);
+                        Log.v(TAG, "\tendpoint: " + content);
+                        break;
+                    }
                     case "defaultTTL": {
                         int ttl = Integer.parseInt(content);
                         protocolDefinition.putInt(

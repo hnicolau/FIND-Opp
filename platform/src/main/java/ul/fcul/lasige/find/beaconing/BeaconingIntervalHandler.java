@@ -57,7 +57,7 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
     /**
      * Timeout each beaconing slot, 15 seconds
      */
-    private static final int WIFI_SWITCH_TIMEOUT = 15* 1000; // 15 seconds
+    private static final int WIFI_SWITCH_TIMEOUT = 30* 1000; // changed from 15 seconds to 30
     /**
      * Maximum number of beaconing slots, 4
      */

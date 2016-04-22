@@ -5,6 +5,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Handler;
 import android.os.PowerManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
@@ -125,6 +126,14 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
     private Set<InternetCallback> mInternetCallbacks = new HashSet<>();
     protected Map<String, Integer> mInternetLockCount = new HashMap<>(); // used to keep current internet connection
     protected boolean mHasInternet = false;
+    private Handler mLockResetTimeout = new Handler();
+    private final int mTimeoutInternetLock=60*5*1000;
+    private Runnable mRunnable = new Runnable() {
+        @Override
+        public void run() {
+            resetInternetLock();
+        }
+    };
 
     /**
      * Constructor.
@@ -180,8 +189,9 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
      * @param connected Connectivity status.
      */
     private void notifyInternetCallbacks(boolean connected) {
-        if(connected)
+        if(connected) {
             SynchronizedPackets.syncPackets(mContext);
+        }
 
         for (InternetCallback callback : mInternetCallbacks) {
             callback.onInternetConnection(connected);
@@ -661,12 +671,18 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
 
     /*
      * INTERNET STATE LOCK - used by client applications
+     *  - the platform when downloading or uploading to endpoints
+     *
      */
     /**
      * Acquire Internet lock to force platform to stay in current network.
      * @param appName Client application requesting the lock.
      */
     public synchronized void acquireInternetLock(String appName) {
+        //if its the first internet lock we set a max timer to clear the lock
+        if(mInternetLockCount.size()==0){
+            mLockResetTimeout.postDelayed(mRunnable, mTimeoutInternetLock);
+        }
         mInternetLockCount.put(appName, mInternetLockCount.size());
     }
 
@@ -676,6 +692,10 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
      */
     public synchronized void releaseInternetLock(String appName) {
         mInternetLockCount.remove(appName);
+        //check if all locks have been release an if so stop the timeout for the internet lock
+        if(mInternetLockCount.isEmpty()){
+            mLockResetTimeout.removeCallbacks(mRunnable);
+        }
     }
 
     /**
@@ -1002,4 +1022,6 @@ public class BeaconingManager implements NetworkStateChangeReceiver.NetworkChang
             resolver.notifyChange(uri, null);
         }
     }
+
+
 }

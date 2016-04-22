@@ -19,7 +19,9 @@ import java.util.Date;
 import ul.fcul.lasige.findvictim.app.VictimApp;
 import ul.fcul.lasige.findvictim.data.Alert;
 import ul.fcul.lasige.findvictim.data.DatabaseHelper;
+import ul.fcul.lasige.findvictim.data.TokenStore;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
+import ul.fcul.lasige.findvictim.webservices.WebLogging;
 
 /**
  * Created by hugonicolau on 03/12/15.
@@ -49,6 +51,8 @@ public class GcmScheduler {
     }
 
     public void scheduleAlarm(Context context, Alert alert) {
+        WebLogging.logMessage(context, "scheduled alert", TokenStore.getMacAddress(context), "FindVictim");
+
 
         // schedule start alarm
         Intent startIntent = new Intent(context, GcmSchedulerReceiver.class);
@@ -79,6 +83,8 @@ public class GcmScheduler {
             mAlarmManager.set(AlarmManager.RTC_WAKEUP, date.getTime() + duration, mStopSensorsIntent);
             Log.d(TAG, "Alert scheduled to stop at " + new Date(date.getTime() + duration).toString());
         }
+
+
     }
 
     public void cancelAlarm(Context context) {

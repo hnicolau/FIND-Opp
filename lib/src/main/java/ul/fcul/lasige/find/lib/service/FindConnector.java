@@ -4,7 +4,9 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.content.res.XmlResourceParser;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -71,13 +73,19 @@ public class FindConnector implements Handler.Callback {
     // internet observer
     private InternetObserver mInternetObserver = null;
 
+    //protocol register stuff
+    private int resourceId=-1;
+    private PacketObserver.PacketCallback packetCallBack;
+    private NeighborObserver.NeighborCallback neighborCallback;
+
+
     /**
      * Enables access to singleton instance of FindConnector.
      *
      * @param context Context of client app.
      * @return FindConnector instance.
      */
-    public static synchronized FindConnector getInstance(Context context) {
+    public static synchronized FindConnector getInstance(Context context ) {
         if (sInstance == null) { sInstance = new FindConnector(context); }
         return sInstance;
     }
@@ -104,7 +112,7 @@ public class FindConnector implements Handler.Callback {
         mPlatformAvailable = mContext.bindService(serviceIntent, mMessenger, Context.BIND_AUTO_CREATE);
 
         if (mPlatformAvailable) {
-            Log.d(TAG, "Successfully bound with the FIND platform");
+            Log.d(TAG, "Successfully bound with the FIND platform" +TokenStore.getApiKey(mContext) );
             mMessenger.setApiKey(TokenStore.getApiKey(mContext));
             // create new internet observer
             if(callback!=null) {
@@ -162,6 +170,10 @@ public class FindConnector implements Handler.Callback {
      */
     public boolean registerProtocolsFromResources(int resourceId, PacketObserver.PacketCallback packetCallback,
                                                   NeighborObserver.NeighborCallback neighborCallback) {
+        this.resourceId = resourceId;
+        this.packetCallBack = packetCallback;
+        this.neighborCallback = neighborCallback;
+
         if (!mPlatformAvailable) {
             // connection was not established
             Log.d(TAG, "Platform not available");
@@ -188,6 +200,7 @@ public class FindConnector implements Handler.Callback {
                     // tokens, which allow or deny access to the content provider data. If we indeed
                     // have stale tokens, we let them replace as if there was no registered token
                     // before - if the token still works, nothing else needs to be done
+                    Log.d(TAG, " client was still running " + protocolName + " "+protocolToken);
                     registerProtocolObserver(protocolName, protocolToken, packetCallback, neighborCallback);
 
                     // continue to next protocol
@@ -206,10 +219,10 @@ public class FindConnector implements Handler.Callback {
                     }
                 }
             }
-
-            mMessenger.sendCommand(FindMessenger.MSG_REGISTER_PROTOCOL, protocolDescription);
             mPacketCallbacks.put(protocolName, packetCallback);
             mNeighborCallbacks.put(protocolName, neighborCallback);
+            mMessenger.sendCommand(FindMessenger.MSG_REGISTER_PROTOCOL, protocolDescription);
+
         }
         return true;
     }
@@ -287,26 +300,31 @@ public class FindConnector implements Handler.Callback {
                 final Bundle protocolNameAndToken = msg.peekData();
                 // if data is valid
                 if (protocolNameAndToken != null) {
+
                     // get name
                     final String protocolName = protocolNameAndToken.getString(FindMessenger.EXTRA_PROTOCOL_NAME);
                     // get token
                     final String protocolToken = protocolNameAndToken.getString(FindMessenger.EXTRA_PROTOCOL_TOKEN);
+                    Log.d(TAG, "Received from FIND service: " + protocolName + " "+protocolToken);
 
                     // register protocol locally
-                    mProtocolRegistry.add(protocolName, protocolToken);
+                    if(!mProtocolRegistry.contains(protocolName)){
+                        mProtocolRegistry.add(protocolName, protocolToken);
 
-                    // get callback previously sent by client app
-                    PacketObserver.PacketCallback packetCallback = mPacketCallbacks.remove(protocolName);
-                    if (packetCallback == null) {
-                        throw new IllegalStateException("No callback found to observe protocol " + protocolName);
-                    } else {
-                        NeighborObserver.NeighborCallback neighborCallback = mNeighborCallbacks.remove(protocolName);
-                        if(neighborCallback == null) {
-                            throw new IllegalStateException("No neighbor callback found to observe protocol " + protocolName);
-                        }
-                        else {
-                            // register new protocol observer with callback, protocol name, and token
-                            registerProtocolObserver(protocolName, protocolToken, packetCallback, neighborCallback);
+                        // get callback previously sent by client app
+                        PacketObserver.PacketCallback packetCallback = mPacketCallbacks.remove(protocolName);
+                        if (packetCallback == null) {
+                            throw new IllegalStateException("No callback found to observe protocol " + protocolName);
+                        } else {
+                            NeighborObserver.NeighborCallback neighborCallback = mNeighborCallbacks.remove(protocolName);
+                            if(neighborCallback == null) {
+                                throw new IllegalStateException("No neighbor callback found to observe protocol " + protocolName);
+                            }
+                            else {
+                                // register new protocol observer with callback, protocol name, and token
+                                Log.d(TAG, "register new protocol observer with callback, protocol name, and token " + protocolName + " "+protocolToken);
+                                registerProtocolObserver(protocolName, protocolToken, packetCallback, neighborCallback);
+                            }
                         }
                     }
                 }
@@ -377,7 +395,14 @@ public class FindConnector implements Handler.Callback {
     public void enqueuePacket(byte[] data) {
         if (mPlatformAvailable) {
             final String protocolToken = mProtocolRegistry.getSingleToken();
-            if(protocolToken == null) return;
+            if(protocolToken == null){
+                //TODO find out why there is the need for registration and solve it instead of doing it at run time
+                Log.d(TAG, "Protocol null.... Re registering");
+                reregisterProtocol();
+                return;
+            }
+            Log.d(TAG, "Protocol enqueing:" +protocolToken);
+
             enqueuePacket(protocolToken, data);
         }
         else {
@@ -400,7 +425,12 @@ public class FindConnector implements Handler.Callback {
     public void enqueuePacket(byte[] data, byte[] targetNodeId) {
         if (mPlatformAvailable) {
             final String protocolToken = mProtocolRegistry.getSingleToken();
-            if(protocolToken == null) return;
+            if(protocolToken == null){
+                //TODO find out why there is the need for registration and solve it instead of doing it at run time
+                Log.d(TAG, "Protocol null.... Re registering");
+                reregisterProtocol();
+                return;
+            }
             enqueuePacket(protocolToken, data, targetNodeId);
         }
         else {
@@ -576,6 +606,29 @@ public class FindConnector implements Handler.Callback {
 
     public void setMessengerKey(String apiKey){
         mMessenger.setApiKey(apiKey);
+
+    }
+
+
+
+    public void reregisterProtocol() {
+        Resources res = mContext.getResources();
+        // get parser that know how to read the XML
+        if(resourceId==-1)
+            return;
+        ProtocolDefinitionParser parser = new ProtocolDefinitionParser(res.getXml(resourceId));
+
+        Bundle protocolDescription;
+        // for each protocol in XML
+        while ((protocolDescription = parser.nextProtocol()) != null) {
+            final String protocolName = protocolDescription.getString(FindContract.Protocols.COLUMN_IDENTIFIER);
+            mPacketCallbacks.put(protocolName, packetCallBack);
+            mNeighborCallbacks.put(protocolName, neighborCallback);
+            mMessenger.sendCommand(FindMessenger.MSG_REGISTER_PROTOCOL, protocolDescription);
+
+            }
+
+
 
     }
 

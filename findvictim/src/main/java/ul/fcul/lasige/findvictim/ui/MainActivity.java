@@ -1,6 +1,9 @@
 package ul.fcul.lasige.findvictim.ui;
 
+import android.Manifest;
 import android.accounts.AccountManager;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -10,10 +13,12 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -29,10 +34,15 @@ import com.google.android.gms.common.AccountPicker;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 
+import java.util.Locale;
+
+import ul.fcul.lasige.find.lib.data.Packet;
+import ul.fcul.lasige.find.lib.data.PacketObserver;
 import ul.fcul.lasige.findvictim.R;
 import ul.fcul.lasige.findvictim.data.TokenStore;
 import ul.fcul.lasige.findvictim.gcm.RegistrationIntentService;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
+import ul.fcul.lasige.findvictim.utils.DeviceUtils;
 
 public class MainActivity extends AppCompatActivity implements SensorsService.Callback {
     private static final String TAG = MainActivity.class.getSimpleName();
@@ -61,11 +71,11 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-
         mToggleButton = (Button) findViewById(R.id.toggleButton);
         mDescriptionView = (TextView) findViewById(R.id.descriptionView);
 
         final CoordinatorLayout coordinatorLayout = (CoordinatorLayout) findViewById(R.id.coordinatorLayout);
+
 
         mToggleButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -77,7 +87,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
                         mSensors.deactivateSensors();
                     }
                     else {
-                        mSensors.activateSensors();
+                        mSensors.activateSensors(true);
                     }
                     toggleState(!isActivated);
                 }
@@ -98,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
                 boolean sentToken = TokenStore.isRegistered(getApplicationContext());
                 if (sentToken) {
                     Snackbar.make(coordinatorLayout, "Congratulations! The registration is complete", Snackbar.LENGTH_LONG).show();
+                    //TODO make sure we have permissions
                 } else {
                     Log.d(TAG, "token not sent");
                     Snackbar snack = Snackbar.make(coordinatorLayout, "Registration failed. Check your Internet connection",
@@ -240,13 +251,23 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
         // gets mac_address (user identification)
         WifiManager manager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         WifiInfo info = manager.getConnectionInfo();
-        manager.setWifiEnabled(true);
-        String mac= info.getMacAddress();
+        if(!manager.isWifiEnabled())
+            manager.setWifiEnabled(true);
+        String mac;
+        int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+        if (currentapiVersion <= Build.VERSION_CODES.LOLLIPOP_MR1){
+            mac = info.getMacAddress();
+        } else{
+            mac = DeviceUtils.getWifiMacAddress();
+        }
+
         Log.d(TAG, "Mac_address:"+ mac);
 
         // Start IntentService to register this application with GCM.
         RegistrationIntentService.startGCMRegistration(this, locale, mac, mGoogleAccount);
     }
+
+
 
     /*
      * MENUS
@@ -282,4 +303,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
             }
         });
     }
+
+
+
 }

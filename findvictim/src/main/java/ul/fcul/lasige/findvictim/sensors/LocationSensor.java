@@ -1,7 +1,10 @@
 package ul.fcul.lasige.findvictim.sensors;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Criteria;
 import android.location.Location;
@@ -13,6 +16,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
@@ -23,7 +27,7 @@ import java.lang.reflect.Method;
  * Updates geographical location positioning data. It uses
  * {@link android.content.SharedPreferences SharedPreferences} to store the
  * value temporally and allow shared access to other components.
- * <p>
+ * <p/>
  * The Location Provider uses the device's GPS to get the current location. Each
  * location has an associated confidence level
  *
@@ -90,10 +94,8 @@ public class LocationSensor extends AbstractSensor {
      * Determines whether one Location reading is better than the current
      * Location fix
      *
-     * @param newLocation
-     *            The new Location that to evaluate
-     * @param currentBestLocation
-     *            The current Location fix, to compare the new one
+     * @param newLocation         The new Location that to evaluate
+     * @param currentBestLocation The current Location fix, to compare the new one
      */
     private static boolean isBetterLocation(Location newLocation,
                                             Location currentBestLocation) {
@@ -123,8 +125,7 @@ public class LocationSensor extends AbstractSensor {
     /**
      * Creates a new LocationSensor to gather geographical location updates
      *
-     * @param c
-     *            Android context
+     * @param c Android context
      */
     public LocationSensor(Context c) {
         super(c);
@@ -132,6 +133,7 @@ public class LocationSensor extends AbstractSensor {
 
         mLocManager = (LocationManager) context
                 .getSystemService(Context.LOCATION_SERVICE);
+
         handler = new Handler();
         currentBestLocation = new Location(""); // latitude and longitude are zero by default
         currentInterval = INITIAL_INTERVAL;
@@ -159,18 +161,18 @@ public class LocationSensor extends AbstractSensor {
     /**
      * Registers an event listener to get GPS/wifi updates
      *
-     * @param locListener
-     *            location listener to receive coordinate updates
+     * @param locListener location listener to receive coordinate updates
      */
     private void registerLocationListeners(LocationListener locListener) {
 
         unregisterLocationListener(locListener);
         try {
+
             mLocManager.requestLocationUpdates(currentProvider, currentInterval,
-                DISTANCE, locListener);
-         } catch (SecurityException e) {
-        Log.e(TAG, "Location services permissions are not enabled!");
-    }
+                    DISTANCE, locListener);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Location services permissions are not enabled!");
+        }
     }
 
     private String getBestProvider() {
@@ -184,8 +186,7 @@ public class LocationSensor extends AbstractSensor {
     /**
      * Unregisters a previously registered location listener
      *
-     * @param locListener
-     *            location listener to remove
+     * @param locListener location listener to remove
      */
     private void unregisterLocationListener(LocationListener locListener) {
         try {

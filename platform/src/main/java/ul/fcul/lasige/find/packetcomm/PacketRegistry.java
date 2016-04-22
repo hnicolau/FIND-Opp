@@ -220,6 +220,32 @@ public class PacketRegistry {
     }
 
     /**
+     * Registers an outgoing packet to be send to neighbors.
+     * @return Packet id in database or 0 if an error occurred.
+     */
+    public long registerDownloadedPacket(byte []data,byte [] protocolHash, long ttl) {
+        // synch access
+        synchronized (LOCK) {
+            // insert and get id
+            final long packetId = mDbController.insertDownloadedPacket(data, protocolHash, ttl);
+            if (packetId > 0) {
+                // success!
+                mUnencryptedBroadcastingPackets.add(packetId);
+
+                // get packet from database
+                TransportPacketOrBuilder packet = mDbController.getPacket(packetId);
+                for (PacketAddedCallback callback : mCallbacks) {
+                    // notify callbacks
+                    callback.onOutgoingPacketAdded(packet, packetId);
+                }
+            }
+            return packetId;
+        }
+    }
+
+
+
+    /**
      * Retrieves a set of packet ids that should be sent to a given neighbor. These include all
      * forwarding packets, broadcasting packets (not encrypted or with a target), and all packets with
      * protocols supported by the neighbor. Duplicate packets are included only once.
