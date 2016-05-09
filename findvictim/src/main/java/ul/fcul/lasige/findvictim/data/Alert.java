@@ -33,10 +33,9 @@ public class Alert {
     public enum STATUS { SCHEDULED, ONGOING, STOPPED };
     private STATUS mStatus;
 
-    public Alert(String name, String location, String date, String duration, String latStart, String lonStart, String latEnd,
+    public Alert(String name , String date, String duration, String latStart, String lonStart, String latEnd,
                  String lonEnd, STATUS status) {
         mName = name;
-        mLocation = location;
         mDate = date;
         mDuration = duration;
         mLatStart = latStart;
@@ -78,7 +77,6 @@ public class Alert {
             duration = data.getString(data.getColumnIndex(Store.COLUMN_DURATION));
 
         return new Alert(data.getString(data.getColumnIndex(Store.COLUMN_NAME)),
-                data.getString(data.getColumnIndex(Store.COLUMN_LOCATION)),
                 data.getString(data.getColumnIndex(Store.COLUMN_DATE)),
                 duration,
                 data.getString(data.getColumnIndex(Store.COLUMN_LAT_START)),
@@ -95,7 +93,6 @@ public class Alert {
         public static final String TABLE_NAME = "alerts";
 
         public static final String COLUMN_NAME = "name";
-        public static final String COLUMN_LOCATION = "location";
         public static final String COLUMN_DATE = "date";
         public static final String COLUMN_DURATION = "duration";
         public static final String COLUMN_LAT_START= "lat_start";
@@ -109,7 +106,6 @@ public class Alert {
                 "CREATE TABLE " + TABLE_NAME + " ("
                         + _ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                         + COLUMN_NAME + " TEXT UNIQUE NOT NULL, "
-                        + COLUMN_LOCATION + " TEXT NOT NULL, "
                         + COLUMN_DATE + " TEXT NOT NULL, "
                         + COLUMN_DURATION + " TEXT, "
                         + COLUMN_LAT_START + " TEXT NOT NULL, "
@@ -121,7 +117,7 @@ public class Alert {
         /* query methods */
         public static Cursor fetchAllAlerts(SQLiteDatabase db) {
             String[] columns = new String[] {
-                    _ID, COLUMN_NAME, COLUMN_LOCATION, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
+                    _ID, COLUMN_NAME, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
                     COLUMN_LAT_END, COLUMN_LON_END, COLUMN_STATUS};
 
             return db.query(TABLE_NAME, columns, null, null, null, null, COLUMN_DATE);
@@ -129,7 +125,7 @@ public class Alert {
 
         public static Cursor fetchAlerts(SQLiteDatabase db, STATUS status) {
             String[] columns = new String[] {
-                    _ID, COLUMN_NAME, COLUMN_LOCATION, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
+                    _ID, COLUMN_NAME, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
                     COLUMN_LAT_END, COLUMN_LON_END, COLUMN_STATUS};
             return db.query(TABLE_NAME,
                     columns,
@@ -149,7 +145,6 @@ public class Alert {
         public static long addAlert(SQLiteDatabase db, Alert alert) {
             ContentValues values = new ContentValues();
             values.put(COLUMN_NAME, alert.mName);
-            values.put(COLUMN_LOCATION, alert.mLocation);
             values.put(COLUMN_DATE, alert.mDate);
             values.put(COLUMN_DURATION, alert.mDuration);
             values.put(COLUMN_LAT_START, alert.mLatStart);

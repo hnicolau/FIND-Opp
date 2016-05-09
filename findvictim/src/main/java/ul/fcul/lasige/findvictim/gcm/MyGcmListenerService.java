@@ -26,10 +26,9 @@ import ul.fcul.lasige.findvictim.sensors.SensorsService;
 public class MyGcmListenerService extends GcmListenerService {
     private static final String TAG = MyGcmListenerService.class.getSimpleName();
 
-    private static final String KEY_GCM_TYPE = "type";
+    private static final String KEY_GCM_TYPE = "gcm_type";
     private static final String KEY_GCM_ALERT_MODE = "mode";
     private static final String KEY_GCM_ALERT_NAME = "name";
-    private static final String KEY_GCM_ALERT_LOCATION = "location";
     private static final String KEY_GCM_ALERT_DATE = "date";
     private static final String KEY_GCM_ALERT_DURATION = "duration";
     private static final String KEY_GCM_ALERT_LAT_S = "latS";
@@ -51,10 +50,12 @@ public class MyGcmListenerService extends GcmListenerService {
     @Override
     public void onMessageReceived(String from, Bundle data) {
         Log.d(TAG, "GCM Message Received from: " + from);
+        Log.e(TAG,"GCM Message Received from: " +data.getString(KEY_GCM_TYPE));
 
         if (from.startsWith("/topics/")) {
             // message received from some topic.
         } else {
+            Log.e(TAG,data.getString(KEY_GCM_TYPE));
             // normal downstream message.
             int type = Integer.valueOf(data.getString(KEY_GCM_TYPE));
             Log.d(TAG, "Type: " + type);
@@ -86,7 +87,6 @@ public class MyGcmListenerService extends GcmListenerService {
         Log.d(TAG, "LonE: " + data.getString("lonE"));
 
         String name = data.getString(KEY_GCM_ALERT_NAME);
-        String location = data.getString(KEY_GCM_ALERT_LOCATION);
         String date = data.getString(KEY_GCM_ALERT_DATE);
         String duration = data.getString(KEY_GCM_ALERT_DURATION);
         String latS = data.getString(KEY_GCM_ALERT_LAT_S);
@@ -117,7 +117,7 @@ public class MyGcmListenerService extends GcmListenerService {
             return;
 
         // store alert (persistently)
-        Alert alert = new Alert(name, location, date, duration, latS, lonS, latE, lonE, Alert.STATUS.SCHEDULED);
+        Alert alert = new Alert(name, date, duration, latS, lonS, latE, lonE, Alert.STATUS.SCHEDULED);
         Alert.Store.addAlert(DatabaseHelper.getInstance(getApplicationContext()).getReadableDatabase(), alert);
 
         // schedule start

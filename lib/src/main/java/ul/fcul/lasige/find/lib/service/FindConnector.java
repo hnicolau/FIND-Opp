@@ -370,6 +370,7 @@ public class FindConnector implements Handler.Callback {
         mPacketObservers.put(protocolName, packetObserver);
         // register observer with FIND platform through content resolver
         packetObserver.register();
+
         // check existing packets
         packetObserver.onChange(true);
 
