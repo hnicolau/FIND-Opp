@@ -2,6 +2,7 @@ package ul.fcul.lasige.find.sample.ui;
 
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.format.DateUtils;
@@ -144,7 +145,7 @@ public class MainActivity extends AppCompatActivity implements PacketObserver.Pa
      * FIND - PACKET CALLBACK
      */
     @Override
-    public void onPacketReceived(Packet packet) {
+    public void onPacketReceived(Packet packet, Uri ui) {
         Log.d(TAG, "Packet received");
         Message newMsg = new Message();
         newMsg.content = new String(packet.getData());
