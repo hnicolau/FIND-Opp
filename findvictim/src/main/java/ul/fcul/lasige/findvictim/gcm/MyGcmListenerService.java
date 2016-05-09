@@ -29,6 +29,8 @@ public class MyGcmListenerService extends GcmListenerService {
     private static final String KEY_GCM_TYPE = "gcm_type";
     private static final String KEY_GCM_ALERT_MODE = "mode";
     private static final String KEY_GCM_ALERT_NAME = "name";
+    private static final String KEY_GCM_ALERT_DESCRIPTION = "description";
+    private static final String KEY_GCM_ALERT_ID = "alertID";
     private static final String KEY_GCM_ALERT_DATE = "date";
     private static final String KEY_GCM_ALERT_DURATION = "duration";
     private static final String KEY_GCM_ALERT_LAT_S = "latS";
@@ -65,7 +67,7 @@ public class MyGcmListenerService extends GcmListenerService {
                     startFindVictimService(data);
                     break;
                 case STOP:
-                    stopFindVictimService();
+                    stopFindVictimService(data);
                     break;
                 case MODE:
                     changeMode(data);
@@ -78,7 +80,8 @@ public class MyGcmListenerService extends GcmListenerService {
     private void startFindVictimService(Bundle data) {
         Log.d(TAG, "Mode: " + data.getString("mode"));
         Log.d(TAG, "Name: " + data.getString("name"));
-        Log.d(TAG, "Location: " + data.getString("location"));
+        Log.d(TAG, "Description: " + data.getString("description"));
+        Log.d(TAG, "AlertID: " + data.getString("alertID"));
         Log.d(TAG, "Date: " + data.getString("date"));
         Log.d(TAG, "Duration: " + data.getString("duration"));
         Log.d(TAG, "LatS: " + data.getString("latS"));
@@ -87,6 +90,8 @@ public class MyGcmListenerService extends GcmListenerService {
         Log.d(TAG, "LonE: " + data.getString("lonE"));
 
         String name = data.getString(KEY_GCM_ALERT_NAME);
+        String description = data.getString(KEY_GCM_ALERT_DESCRIPTION);
+        int alertID = Integer.valueOf(data.getString(KEY_GCM_ALERT_ID));
         String date = data.getString(KEY_GCM_ALERT_DATE);
         String duration = data.getString(KEY_GCM_ALERT_DURATION);
         String latS = data.getString(KEY_GCM_ALERT_LAT_S);
@@ -117,16 +122,16 @@ public class MyGcmListenerService extends GcmListenerService {
             return;
 
         // store alert (persistently)
-        Alert alert = new Alert(name, date, duration, latS, lonS, latE, lonE, Alert.STATUS.SCHEDULED);
+        Alert alert = new Alert(name, description, alertID, date, duration, latS, lonS, latE, lonE, Alert.STATUS.SCHEDULED);
         Alert.Store.addAlert(DatabaseHelper.getInstance(getApplicationContext()).getReadableDatabase(), alert);
 
         // schedule start
         GcmScheduler.getInstance(getApplicationContext()).scheduleAlarm(getApplicationContext(), alert);
     }
 
-    private void stopFindVictimService() {
+    private void stopFindVictimService(Bundle data) {
         // cancel alarm
-        GcmScheduler.getInstance(getApplicationContext()).cancelAlarm(getApplicationContext());
+        GcmScheduler.getInstance(getApplicationContext()).cancelAlarm(getApplicationContext(),   Integer.valueOf(data.getString(KEY_GCM_ALERT_ID)));
     }
 
     private void changeMode(Bundle data) {

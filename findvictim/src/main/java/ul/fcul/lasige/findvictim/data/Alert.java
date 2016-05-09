@@ -22,7 +22,8 @@ public class Alert {
     private static final String TAG = Alert.class.getSimpleName();
 
     protected String mName;
-    protected String mLocation;
+    protected int mAlertID;
+    protected String mDescription;
     protected String mDate;
     protected String mDuration;
     protected String mLatStart;
@@ -33,9 +34,11 @@ public class Alert {
     public enum STATUS { SCHEDULED, ONGOING, STOPPED };
     private STATUS mStatus;
 
-    public Alert(String name , String date, String duration, String latStart, String lonStart, String latEnd,
+    public Alert(String name ,String description, int alertID, String date, String duration, String latStart, String lonStart, String latEnd,
                  String lonEnd, STATUS status) {
         mName = name;
+        mDescription = description;
+        mAlertID = alertID;
         mDate = date;
         mDuration = duration;
         mLatStart = latStart;
@@ -69,6 +72,8 @@ public class Alert {
     public double getLonStart() { return Double.valueOf(mLonStart); }
     public double getLatEnd() { return Double.valueOf(mLatEnd); }
     public double getLonEnd() { return Double.valueOf(mLonEnd); }
+    public String getDescription() { return mDescription;  }
+    public int getAlertID() { return mAlertID;   }
 
     public static Alert fromCursor(Cursor data) {
         // check possible null columns
@@ -77,6 +82,8 @@ public class Alert {
             duration = data.getString(data.getColumnIndex(Store.COLUMN_DURATION));
 
         return new Alert(data.getString(data.getColumnIndex(Store.COLUMN_NAME)),
+                data.getString(data.getColumnIndex(Store.COLUMN_DESCRIPTION)),
+                data.getInt(data.getColumnIndex(Store.COLUMN_ALERT_ID)),
                 data.getString(data.getColumnIndex(Store.COLUMN_DATE)),
                 duration,
                 data.getString(data.getColumnIndex(Store.COLUMN_LAT_START)),
@@ -93,6 +100,8 @@ public class Alert {
         public static final String TABLE_NAME = "alerts";
 
         public static final String COLUMN_NAME = "name";
+        public static final String COLUMN_DESCRIPTION = "description";
+        public static final String COLUMN_ALERT_ID = "alert_id";
         public static final String COLUMN_DATE = "date";
         public static final String COLUMN_DURATION = "duration";
         public static final String COLUMN_LAT_START= "lat_start";
@@ -105,7 +114,9 @@ public class Alert {
         public static final String SQL_CREATE_TABLE =
                 "CREATE TABLE " + TABLE_NAME + " ("
                         + _ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                        + COLUMN_NAME + " TEXT UNIQUE NOT NULL, "
+                        + COLUMN_NAME + " TEXT NOT NULL, "
+                        + COLUMN_DESCRIPTION + " TEXT, "
+                        + COLUMN_ALERT_ID+ " INTEGER, "
                         + COLUMN_DATE + " TEXT NOT NULL, "
                         + COLUMN_DURATION + " TEXT, "
                         + COLUMN_LAT_START + " TEXT NOT NULL, "
@@ -117,7 +128,7 @@ public class Alert {
         /* query methods */
         public static Cursor fetchAllAlerts(SQLiteDatabase db) {
             String[] columns = new String[] {
-                    _ID, COLUMN_NAME, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
+                    _ID,  COLUMN_NAME,COLUMN_DESCRIPTION,COLUMN_ALERT_ID, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
                     COLUMN_LAT_END, COLUMN_LON_END, COLUMN_STATUS};
 
             return db.query(TABLE_NAME, columns, null, null, null, null, COLUMN_DATE);
@@ -125,7 +136,7 @@ public class Alert {
 
         public static Cursor fetchAlerts(SQLiteDatabase db, STATUS status) {
             String[] columns = new String[] {
-                    _ID, COLUMN_NAME, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
+                    _ID, COLUMN_NAME, COLUMN_DESCRIPTION,COLUMN_ALERT_ID,COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
                     COLUMN_LAT_END, COLUMN_LON_END, COLUMN_STATUS};
             return db.query(TABLE_NAME,
                     columns,
@@ -145,6 +156,8 @@ public class Alert {
         public static long addAlert(SQLiteDatabase db, Alert alert) {
             ContentValues values = new ContentValues();
             values.put(COLUMN_NAME, alert.mName);
+            values.put(COLUMN_DESCRIPTION, alert.mDescription);
+            values.put(COLUMN_ALERT_ID, alert.mAlertID);
             values.put(COLUMN_DATE, alert.mDate);
             values.put(COLUMN_DURATION, alert.mDuration);
             values.put(COLUMN_LAT_START, alert.mLatStart);
@@ -164,41 +177,41 @@ public class Alert {
         }
 
         /* update methods */
-        public static boolean updateAlertStatus(SQLiteDatabase db, String name, STATUS status) {
+        public static boolean updateAlertStatus(SQLiteDatabase db, int alertID, STATUS status) {
 
             boolean success = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-                success = updateAlertStatus_postSDK11(db, name, status);
+                success = updateAlertStatus_postSDK11(db, alertID, status);
             } else {
-                success = updateAlertStatus_preSDK11(db, name, status);
+                success = updateAlertStatus_preSDK11(db, alertID, status);
             }
             return success;
         }
 
         @TargetApi(Build.VERSION_CODES.HONEYCOMB)
-        private static boolean updateAlertStatus_postSDK11(SQLiteDatabase db, String name, STATUS status) {
+        private static boolean updateAlertStatus_postSDK11(SQLiteDatabase db, int alertID, STATUS status) {
             final SQLiteStatement updateStmt = db.compileStatement(
                     "update " + TABLE_NAME + " set "
                             + COLUMN_STATUS + " = ?"
-                            + " where " + COLUMN_NAME + " = ?");
+                            + " where " + COLUMN_ALERT_ID + " = ?");
 
             // Bind updated values
             updateStmt.bindString(1, status.name());
 
             // Bind values for WHERE clause
-            updateStmt.bindString(2, name);
+            updateStmt.bindLong(2, alertID);
 
             return (updateStmt.executeUpdateDelete() > 0);
         }
 
-        private static boolean updateAlertStatus_preSDK11(SQLiteDatabase db, String name, STATUS status) {
+        private static boolean updateAlertStatus_preSDK11(SQLiteDatabase db, int alertID, STATUS status) {
             final StringBuilder updateQueryString =
                     new StringBuilder("update " + TABLE_NAME + " set ")
                             .append(COLUMN_STATUS + " = ")
                             .append(status.name());
 
             // Add WHERE clause
-            updateQueryString.append(" where " + COLUMN_NAME + " = ").append(name);
+            updateQueryString.append(" where " + COLUMN_ALERT_ID + " = ").append(alertID);
 
             db.execSQL(updateQueryString.toString());
             return true;

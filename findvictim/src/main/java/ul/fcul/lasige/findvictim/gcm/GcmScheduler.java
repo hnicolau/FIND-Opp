@@ -31,7 +31,7 @@ public class GcmScheduler {
 
     public static final String ACTION_SCHEDULE_START = "ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_START";
     public static final String ACTION_SCHEDULE_STOP = "ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_STOP";
-    public static final String EXTRA_ALERT_NAME = "name";
+    public static final String EXTRA_ALERT_ID= "alert_id";
 
     // singleton instance
     private static GcmScheduler sInstance = null;
@@ -57,7 +57,7 @@ public class GcmScheduler {
         // schedule start alarm
         Intent startIntent = new Intent(context, GcmSchedulerReceiver.class);
         startIntent.setAction(ACTION_SCHEDULE_START);
-        startIntent.putExtra(EXTRA_ALERT_NAME, alert.getName());
+        startIntent.putExtra(EXTRA_ALERT_ID, alert.getAlertID());
 
         mStartSensorsIntent = PendingIntent.getBroadcast(context, 0,
                 startIntent, PendingIntent.FLAG_UPDATE_CURRENT); // TODO alarmmanager only guarantees one start alarm
@@ -72,7 +72,7 @@ public class GcmScheduler {
         // schedule stop alarm
         Intent stopIntent = new Intent(context, GcmSchedulerReceiver.class);
         stopIntent.setAction(ACTION_SCHEDULE_STOP);
-        stopIntent.putExtra(EXTRA_ALERT_NAME, alert.getName());
+        stopIntent.putExtra(EXTRA_ALERT_ID, alert.getAlertID());
 
         mStopSensorsIntent = PendingIntent.getBroadcast(context, 1234,
                 stopIntent, PendingIntent.FLAG_UPDATE_CURRENT); // TODO alarmmanager only guarantees one stop alarm
@@ -87,25 +87,31 @@ public class GcmScheduler {
 
     }
 
-    public void cancelAlarm(Context context) {
-        if (mStartSensorsIntent != null) {
-            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-            alarmManager.cancel(mStartSensorsIntent);
-            mStartSensorsIntent = null;
-            Log.v(TAG, "Cancelled start alarm");
-        }
+    public void cancelAlarm(Context context, int alertID) {
+        if(Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
+                alertID, Alert.STATUS.STOPPED)) {
 
-        if (mStopSensorsIntent != null) {
-            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-            alarmManager.cancel(mStopSensorsIntent);
-            mStopSensorsIntent = null;
-            Log.v(TAG, "Cancelled stop alarm");
-        }
+            if (mStartSensorsIntent != null) {
+                AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                alarmManager.cancel(mStartSensorsIntent);
+                mStartSensorsIntent = null;
+                Log.v(TAG, "Cancelled start alarm");
+            }
 
-        // stop sensors service
-        VictimApp app = (VictimApp)context.getApplicationContext();
-        app.stopSensors();
+            if (mStopSensorsIntent != null) {
+                AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                alarmManager.cancel(mStopSensorsIntent);
+                mStopSensorsIntent = null;
+                Log.v(TAG, "Cancelled stop alarm");
+            }
+
+            // stop sensors service
+            VictimApp app = (VictimApp) context.getApplicationContext();
+            app.stopSensors();
+        }
     }
+
+
 
     public static class GcmSchedulerReceiver extends BroadcastReceiver {
 
@@ -121,7 +127,7 @@ public class GcmScheduler {
 
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
-                            intent.getStringExtra(EXTRA_ALERT_NAME), Alert.STATUS.ONGOING);
+                            intent.getIntExtra(EXTRA_ALERT_ID,0), Alert.STATUS.ONGOING);
 
                     // start sensors service
                     VictimApp app = (VictimApp)context.getApplicationContext();
@@ -133,7 +139,7 @@ public class GcmScheduler {
 
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
-                            intent.getStringExtra(EXTRA_ALERT_NAME), Alert.STATUS.STOPPED);
+                            intent.getIntExtra(EXTRA_ALERT_ID,0), Alert.STATUS.STOPPED);
 
                     // stop sensors service
                     VictimApp app = (VictimApp)context.getApplicationContext();

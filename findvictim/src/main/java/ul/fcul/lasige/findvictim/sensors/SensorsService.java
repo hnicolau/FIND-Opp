@@ -527,8 +527,8 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         String downloadProtocol = mConnector.getProtocolToken("ul.fcul.lasige.downloading");
         Log.d(TAG, "Download protocol:" + downloadProtocol);
 
-
-        if(ui!=null && ui.getQueryParameters("protocol_token")!=null) {
+        //TODO fix when this call is being made without uri
+        if(ui!=null && ui.getQueryParameters("protocol_token")!=null &&ui.getQueryParameters("protocol_token").size()>0) {
             if (downloadProtocol.equals(ui.getQueryParameters("protocol_token").get(0))) {
                 //do something with packet
                 String data = new String(packet.getData());
