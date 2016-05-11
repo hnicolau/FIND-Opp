@@ -73,6 +73,7 @@ public class PacketObserver extends ContentObserver {
      * CONTENT OBSERVER CONTRACT
      */
 
+
     /**
      * Method is called when content (i.e. incoming packets table) in the FIND platform is changed.
      *
@@ -80,8 +81,6 @@ public class PacketObserver extends ContentObserver {
      */
     @Override
     public void onChange(boolean selfChange) {
-        Log.d(TAG, "Received self Packect Update");
-
         onChange(selfChange, null);
     }
 
@@ -93,18 +92,13 @@ public class PacketObserver extends ContentObserver {
      */
     @Override
     public void onChange(boolean selfChange, Uri uri) {
-        Log.d(TAG, "Received Packect Update");
-
-        if(uri!=null)
-            Log.d(TAG, "Received Packect Update" + uri.toString());
         // get all packets since last one received; this is particularly useful if client app was
         // disconnected and the platform received new packets
         for (Packet packet : getPacketsSince(mTimeLastPacketReceived)) {
             // set timestamp to last packet received; Math.max is to guarantee we don't go back in time
             mTimeLastPacketReceived = Math.max(mTimeLastPacketReceived, packet.getTimeReceived());
             // notifies client app of new packet received
-            mCallback.onPacketReceived(packet,uri);
-            //mCallback.onPacketReceived(packet);
+            mCallback.onPacketReceived(packet, mObservedUri);
         }
         // save last timestamp persistently
         TokenStore.saveLastPacketReceived(mContext, mTimeLastPacketReceived);

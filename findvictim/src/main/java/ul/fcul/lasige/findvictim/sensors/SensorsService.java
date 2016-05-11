@@ -525,19 +525,19 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     public void onPacketReceived(Packet packet, Uri ui) {
 
         String downloadProtocol = mConnector.getProtocolToken("ul.fcul.lasige.downloading");
-        Log.d(TAG, "Download protocol:" + downloadProtocol);
+        String victimProtocol = mConnector.getProtocolToken("ul.fcul.lasige.findvictim");
 
-        //TODO fix when this call is being made without uri
-        if(ui!=null && ui.getQueryParameters("protocol_token")!=null &&ui.getQueryParameters("protocol_token").size()>0) {
-            if (downloadProtocol.equals(ui.getQueryParameters("protocol_token").get(0))) {
+        if (downloadProtocol.equals(ui.getQueryParameters("protocol_token").get(0))) {
+            //do something with packet
+            String data = new String(packet.getData());
+            Log.d(TAG, "Packet downloaded:::" + data);
+        } else {
+            if (victimProtocol.equals(ui.getQueryParameters("protocol_token").get(0))) {
                 //do something with packet
                 String data = new String(packet.getData());
-                Log.d(TAG, "Packet received:::" + data);
+                Log.d(TAG, "Packet victim:::" + data);
             }
-        }else{
-            //TODO  the on change can be triggered by the registering process
         }
-
     }
 
    /* @Override

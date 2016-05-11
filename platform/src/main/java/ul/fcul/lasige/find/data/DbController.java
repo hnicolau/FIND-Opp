@@ -738,6 +738,7 @@ public class DbController {
      * @see PacketQueues
      */
     public long insertIncomingPacket(TransportPacket packet, PacketQueues[] queues) {
+        Log.d(TAG, "INSERTING INCOMING PACKETS!!!!!");
         // build values structure
         final ContentValues data = TransportPacketFactory.toContentValues(packet);
 
@@ -781,12 +782,14 @@ public class DbController {
 
         // insert packet
         final long rowId = insertPacket(data, queues);
+        Log.d(TAG, "ROW ID:"+ rowId );
+
         if (rowId > 0) {
             // Notify listeners that a packet arrived
             for (ClientImplementation impl : implementations) {
                 final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
                 mContext.getContentResolver().notifyChange(notifyUri, null);
-                Log.v(TAG, "Notified URI " + notifyUri);
+                Log.v(TAG, "Notified URI  insertIncomingPacket" + notifyUri);
             }
         }
         return rowId;
@@ -801,6 +804,8 @@ public class DbController {
      * @see ContentValues
      */
     public long insertOutgoingPacket(ClientImplementation implementation, ContentValues data) {
+        Log.d(TAG, "INSERTING OUTGOING PACKETS!!!!!");
+
         // check if packet has data
         if (!data.containsKey(Packets.COLUMN_DATA)) {
             throw new IllegalArgumentException("Packet must contain data");
@@ -848,7 +853,8 @@ public class DbController {
      * @see ClientImplementation
      * @see ContentValues
      */
-    public long insertDownloadedPacket(byte []  data,byte [] protocolHash, long ttl) {
+    public long insertDownloadedPacket(byte []  data, byte [] protocolHash, long ttl) {
+        Log.d(TAG, "INSERTING DOWNLOADED PACKETS!!!!!");
 
         ContentValues cv = new ContentValues();
         cv.put(Packets.COLUMN_DATA, data);
@@ -860,26 +866,41 @@ public class DbController {
         final long currentTime = System.currentTimeMillis() / 1000;
         cv.put(Packets.COLUMN_TTL, ttl+currentTime);
 
-        // get protocol registry
+         // get protocol registry
         final ProtocolRegistry protocolRegistry = ProtocolRegistry.getInstance(mContext);
-        final Set<ClientImplementation> implementations =
+       final Set<ClientImplementation> implementations =
                 protocolRegistry.getProtocolImplementations(protocolHash);
 
         // Notify listeners that a packet arrived
-        for (ClientImplementation impl : implementations) {
+      /* for (ClientImplementation impl : implementations) {
             final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
             mContext.getContentResolver().notifyChange(notifyUri, null);
             Log.v(TAG, "Notified URI " + notifyUri);
-        }
-        Log.d(TAG, "implementations: " + implementations.size());
+        }*/
+       // Log.d(TAG, "implementations: " + implementations.size());
         // create packet
         final TransportPacket packet = TransportPacketFactory.unsignedFromContentValues(cv);
 
         // set packet hash
         cv.put(Packets.COLUMN_PACKET_HASH, CryptoHelper.createDigest(packet.toByteArray()));
+
         /*final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
-        mContext.getContentResolver().notifyChange(notifyUri, null);*/
-        return insertPacket(cv, new PacketQueues[] { PacketQueues.OUTGOING, PacketQueues.INCOMING });
+        mContext.getContentResolver().notifyChange(notifyUri, null);
+        return insertPacket(cv, new PacketQueues[] { PacketQueues.OUTGOING, PacketQueues.INCOMING });*/
+
+        // insert packet
+        final long rowId = insertPacket(cv, new PacketQueues[] { PacketQueues.OUTGOING, PacketQueues.INCOMING });
+        Log.d(TAG, "ROW ID:"+ rowId );
+
+        if (rowId > 0) {
+            // Notify listeners that a packet arrived
+            for (ClientImplementation impl : implementations) {
+                final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
+                mContext.getContentResolver().notifyChange(notifyUri, null);
+                Log.v(TAG, "Notified URI  insertIncomingPacket" + notifyUri);
+            }
+        }
+        return rowId;
     }
 
     /**
@@ -891,6 +912,8 @@ public class DbController {
      * @see PacketQueues
      */
     private long insertPacket(ContentValues packet, PacketQueues[] queues) {
+        Log.d(TAG, "INSERTING PACKETS!!!!!");
+
         // get write access
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
         db.beginTransaction();
@@ -914,8 +937,6 @@ public class DbController {
                 }
 
                 db.setTransactionSuccessful();
-
-                // notify content resolvers
                 mContext.getContentResolver().notifyChange(Packets.URI_ALL, null);
                 mContext.getContentResolver().notifyChange(Packets.URI_OUTGOING, null);
                 return rowId;
