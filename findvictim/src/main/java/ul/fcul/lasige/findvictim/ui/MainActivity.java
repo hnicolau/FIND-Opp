@@ -288,6 +288,9 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            Intent i = new Intent(this,AlertActivity.class);
+            startActivity(i);
+
             return true;
         }
 

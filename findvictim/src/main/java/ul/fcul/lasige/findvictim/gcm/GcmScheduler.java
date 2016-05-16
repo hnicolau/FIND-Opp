@@ -1,13 +1,22 @@
 package ul.fcul.lasige.findvictim.gcm;
 
 import android.app.AlarmManager;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.location.Location;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Looper;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.TaskStackBuilder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
@@ -15,12 +24,19 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 
+import ul.fcul.lasige.findvictim.R;
 import ul.fcul.lasige.findvictim.app.VictimApp;
 import ul.fcul.lasige.findvictim.data.Alert;
 import ul.fcul.lasige.findvictim.data.DatabaseHelper;
 import ul.fcul.lasige.findvictim.data.TokenStore;
+import ul.fcul.lasige.findvictim.sensors.LocationSensor;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
+import ul.fcul.lasige.findvictim.ui.AlertActivity;
+import ul.fcul.lasige.findvictim.ui.MainActivity;
+import ul.fcul.lasige.findvictim.utils.PositionUtils;
 import ul.fcul.lasige.findvictim.webservices.WebLogging;
 
 /**
@@ -31,7 +47,7 @@ public class GcmScheduler {
 
     public static final String ACTION_SCHEDULE_START = "ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_START";
     public static final String ACTION_SCHEDULE_STOP = "ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_STOP";
-    public static final String EXTRA_ALERT_ID= "alert_id";
+    public static final String EXTRA_ALERT_ID = "alert_id";
 
     // singleton instance
     private static GcmScheduler sInstance = null;
@@ -46,13 +62,12 @@ public class GcmScheduler {
     }
 
     public static GcmScheduler getInstance(Context context) {
-        if(sInstance == null) sInstance = new GcmScheduler(context);
+        if (sInstance == null) sInstance = new GcmScheduler(context);
         return sInstance;
     }
 
     public void scheduleAlarm(Context context, Alert alert) {
         WebLogging.logMessage(context, "scheduled alert", TokenStore.getMacAddress(context), "FindVictim");
-
 
         // schedule start alarm
         Intent startIntent = new Intent(context, GcmSchedulerReceiver.class);
@@ -64,7 +79,7 @@ public class GcmScheduler {
 
         // get starting time
         Date date = alert.getDate();
-        if(date != null) {
+        if (date != null) {
             mAlarmManager.set(AlarmManager.RTC_WAKEUP, date.getTime(), mStartSensorsIntent);
             Log.d(TAG, "Alert scheduled to start at " + date.toString());
         }
@@ -79,7 +94,7 @@ public class GcmScheduler {
 
         // get stopping time
         long duration = alert.getDuration();
-        if(duration != -1) {
+        if (duration != -1) {
             mAlarmManager.set(AlarmManager.RTC_WAKEUP, date.getTime() + duration, mStopSensorsIntent);
             Log.d(TAG, "Alert scheduled to stop at " + new Date(date.getTime() + duration).toString());
         }
@@ -87,8 +102,52 @@ public class GcmScheduler {
 
     }
 
+    private void alertNotification(Context context, Alert alert, Alert.DANGER danger) {
+        int icon=0;
+        switch (danger){
+            case IN_LOCATION:
+                icon = R.drawable.warning_notification;
+                break;
+            case UNKNOWN:
+                icon = R.drawable.warning_notification_y;
+                break;
+            case NOT_IN_LOCATION:
+                icon = R.drawable.warning_notification_g;
+                break;
+        }
+        NotificationCompat.Builder mBuilder =
+                new NotificationCompat.Builder(context)
+                        .setSmallIcon(icon)
+                        .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
+                        .setContentText(alert.getDescription());
+        // Creates an explicit intent for an Activity in your app
+        Intent resultIntent = new Intent(context, AlertActivity.class);
+        resultIntent.putExtra("Alert", alert);
+
+
+        // The stack builder object will contain an artificial back stack for the
+        // started Activity.
+        // This ensures that navigating backward from the Activity leads out of
+        // your application to the Home screen.
+        TaskStackBuilder stackBuilder = TaskStackBuilder.create(context);
+        // Adds the back stack for the Intent (but not the Intent itself)
+        stackBuilder.addParentStack(AlertActivity.class);
+        // Adds the Intent that starts the Activity to the top of the stack
+        stackBuilder.addNextIntent(resultIntent);
+        PendingIntent resultPendingIntent =
+                stackBuilder.getPendingIntent(
+                        0,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                );
+        mBuilder.setContentIntent(resultPendingIntent);
+        NotificationManager mNotificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        // mId allows you to update the notification later on.
+        mNotificationManager.notify(1, mBuilder.build());
+    }
+
     public void cancelAlarm(Context context, int alertID) {
-        if(Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
+        if (Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
                 alertID, Alert.STATUS.STOPPED)) {
 
             if (mStartSensorsIntent != null) {
@@ -111,6 +170,59 @@ public class GcmScheduler {
         }
     }
 
+    private HandlerThread mHandlerThread; // thread with queue and looper
+    LocationSensor locationSensor;
+    public void receivedAlert(final Context applicationContext, final Alert alert) {
+        mHandlerThread = new HandlerThread(TAG);
+        mHandlerThread.start();
+        Handler mStateHandler = new Handler(mHandlerThread.getLooper());
+       mStateHandler.post(new Runnable(){
+           @Override
+           public void run() {
+                 locationSensor = new LocationSensor(applicationContext);
+
+               locationSensor.startSensor();
+           }
+           });
+
+        mStateHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+
+                Location location = (Location) locationSensor.getCurrentValue();
+                double lat=location.getLatitude();
+                Log.d(TAG, "latitude:"+ lat);
+
+                if(lat==0){
+                    Log.d(TAG, "Unknowk ");
+
+                    alertNotification(applicationContext, alert, Alert.DANGER.UNKNOWN);
+                    //prompt alert activity
+                }else {
+                    if (PositionUtils.isInLocation(location.getLatitude(), location.getLongitude(), alert.getLatStart(),
+                            alert.getLonStart(), alert.getLatEnd(), alert.getLonEnd())) {
+                        Log.d(TAG, "In location ");
+
+                        alertNotification(applicationContext, alert, Alert.DANGER.IN_LOCATION);
+                        scheduleAlarm(applicationContext,alert);
+                        //TODO Download maps and routes
+                    } else {
+                        Log.d(TAG, "Not In location ");
+                        alertNotification(applicationContext, alert, Alert.DANGER.NOT_IN_LOCATION);
+                    }
+                }
+                locationSensor.stopSensor();
+                if (mHandlerThread!= null) {
+                    Thread moribund = mHandlerThread;
+                    mHandlerThread = null;
+                    moribund.interrupt();
+                }
+            }
+
+
+        }, 30000);
+
+    }
 
 
     public static class GcmSchedulerReceiver extends BroadcastReceiver {
@@ -119,30 +231,29 @@ public class GcmScheduler {
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "Received alarm");
 
-            if(intent != null) {
+            if (intent != null) {
                 String action = intent.getAction();
 
-                if(action != null && action.equalsIgnoreCase(ACTION_SCHEDULE_START)) {
+                if (action != null && action.equalsIgnoreCase(ACTION_SCHEDULE_START)) {
                     Log.d(TAG, "Received alarm to start sensors");
 
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
-                            intent.getIntExtra(EXTRA_ALERT_ID,0), Alert.STATUS.ONGOING);
+                            intent.getIntExtra(EXTRA_ALERT_ID, 0), Alert.STATUS.ONGOING);
 
                     // start sensors service
-                    VictimApp app = (VictimApp)context.getApplicationContext();
+                    VictimApp app = (VictimApp) context.getApplicationContext();
                     app.starSensors();
 
-                }
-                else if(action != null && action.equalsIgnoreCase((ACTION_SCHEDULE_STOP))) {
+                } else if (action != null && action.equalsIgnoreCase((ACTION_SCHEDULE_STOP))) {
                     Log.d(TAG, "Received alarm to stop sensors");
 
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
-                            intent.getIntExtra(EXTRA_ALERT_ID,0), Alert.STATUS.STOPPED);
+                            intent.getIntExtra(EXTRA_ALERT_ID, 0), Alert.STATUS.STOPPED);
 
                     // stop sensors service
-                    VictimApp app = (VictimApp)context.getApplicationContext();
+                    VictimApp app = (VictimApp) context.getApplicationContext();
                     app.stopSensors();
                 }
             }

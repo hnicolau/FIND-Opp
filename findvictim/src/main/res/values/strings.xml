@@ -5,4 +5,5 @@
     <string name="stop">Stop</string>
     <string name="start_description">Announce your location and look for other people.</string>
     <string name="stop_description">Stop announcing your location and looking for others.</string>
+    <string name="title_activity_alert">Alert</string>
 </resources>

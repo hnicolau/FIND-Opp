@@ -30,6 +30,7 @@ public class MyGcmListenerService extends GcmListenerService {
     private static final String KEY_GCM_ALERT_MODE = "mode";
     private static final String KEY_GCM_ALERT_NAME = "name";
     private static final String KEY_GCM_ALERT_DESCRIPTION = "description";
+    private static final String KEY_GCM_ALERT_TYPE = "type";
     private static final String KEY_GCM_ALERT_ID = "alertID";
     private static final String KEY_GCM_ALERT_DATE = "date";
     private static final String KEY_GCM_ALERT_DURATION = "duration";
@@ -91,6 +92,7 @@ public class MyGcmListenerService extends GcmListenerService {
 
         String name = data.getString(KEY_GCM_ALERT_NAME);
         String description = data.getString(KEY_GCM_ALERT_DESCRIPTION);
+        String type = data.getString(KEY_GCM_ALERT_TYPE);
         int alertID = Integer.valueOf(data.getString(KEY_GCM_ALERT_ID));
         String date = data.getString(KEY_GCM_ALERT_DATE);
         String duration = data.getString(KEY_GCM_ALERT_DURATION);
@@ -122,11 +124,11 @@ public class MyGcmListenerService extends GcmListenerService {
             return;
 
         // store alert (persistently)
-        Alert alert = new Alert(name, description, alertID, date, duration, latS, lonS, latE, lonE, Alert.STATUS.SCHEDULED);
+        Alert alert = new Alert(name, description,type, alertID, date, duration, latS, lonS, latE, lonE, Alert.STATUS.SCHEDULED);
         Alert.Store.addAlert(DatabaseHelper.getInstance(getApplicationContext()).getReadableDatabase(), alert);
 
         // schedule start
-        GcmScheduler.getInstance(getApplicationContext()).scheduleAlarm(getApplicationContext(), alert);
+        GcmScheduler.getInstance(getApplicationContext()).receivedAlert(getApplicationContext(), alert);
     }
 
     private void stopFindVictimService(Bundle data) {

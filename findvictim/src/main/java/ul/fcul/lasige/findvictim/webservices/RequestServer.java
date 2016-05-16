@@ -6,6 +6,7 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.util.Base64;
 import android.util.Log;
 
+import com.example.unzi.offlinemaps.DownloadFile;
 import com.loopj.android.http.AsyncHttpResponseHandler;
 import com.loopj.android.http.JsonHttpResponseHandler;
 import com.loopj.android.http.RequestParams;
@@ -14,6 +15,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 
@@ -52,6 +54,9 @@ public class RequestServer {
                     // get endpoint for country
                     getEndPoint(country, context, locale, mac, email, token);
 
+                    //get offline tile database
+                    getTileDatabase(context);
+
                 } catch (JSONException e) {
                     e.printStackTrace();
                     registerOnServer(context, null, locale, mac, email, token, "");
@@ -64,6 +69,14 @@ public class RequestServer {
                 registerOnServer(context, null, locale, mac, email, token, "");
             }
         });
+    }
+
+    private static void getTileDatabase(Context context) {
+        File bd = new File(context.getFilesDir()+"/mapapp/world.sqlitedb");
+        DownloadFile d;
+        if (!bd.exists()) {
+            d = new DownloadFile(context);
+        }
     }
 
     private static void getEndPoint(String country, final Context context, final String locale, final String mac, final String email, final String token) {

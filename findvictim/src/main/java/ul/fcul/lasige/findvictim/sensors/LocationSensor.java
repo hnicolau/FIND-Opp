@@ -144,6 +144,7 @@ public class LocationSensor extends AbstractSensor {
         currentProvider = getBestProvider();
         Log.i(TAG, "Chosen provider: " + currentProvider);
         registerLocationListeners(locationListener);
+        Log.i(TAG, "Current interval: " + currentInterval);
         handler.postDelayed(mRunnable, currentInterval);
     }
 
@@ -164,7 +165,7 @@ public class LocationSensor extends AbstractSensor {
      * @param locListener location listener to receive coordinate updates
      */
     private void registerLocationListeners(LocationListener locListener) {
-
+        Log.d(TAG, "registering location listener");
         unregisterLocationListener(locListener);
         try {
 
@@ -205,7 +206,7 @@ public class LocationSensor extends AbstractSensor {
 
         @Override
         public void run() {
-            //Log.i(TAG, "run");
+            Log.i(TAG, "run");
 
             if (betterConnectionAvailable()) {
                 // change provider

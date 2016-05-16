@@ -10,6 +10,7 @@ import android.os.Build;
 import android.provider.BaseColumns;
 import android.util.Log;
 
+import java.io.Serializable;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -18,12 +19,14 @@ import java.util.Date;
 /**
  * Created by hugonicolau on 02/12/15.
  */
-public class Alert {
+@SuppressWarnings("serial") //With this annotation we are going to hide compiler warnings
+public class Alert implements Serializable {
     private static final String TAG = Alert.class.getSimpleName();
 
     protected String mName;
     protected int mAlertID;
     protected String mDescription;
+    protected String mType;
     protected String mDate;
     protected String mDuration;
     protected String mLatStart;
@@ -32,12 +35,15 @@ public class Alert {
     protected String mLonEnd;
 
     public enum STATUS { SCHEDULED, ONGOING, STOPPED };
+    public enum DANGER { NOT_IN_LOCATION, UNKNOWN, IN_LOCATION };
+
     private STATUS mStatus;
 
-    public Alert(String name ,String description, int alertID, String date, String duration, String latStart, String lonStart, String latEnd,
+    public Alert(String name ,String description,String type, int alertID, String date, String duration, String latStart, String lonStart, String latEnd,
                  String lonEnd, STATUS status) {
         mName = name;
         mDescription = description;
+        mType = type;
         mAlertID = alertID;
         mDate = date;
         mDuration = duration;
@@ -51,6 +57,7 @@ public class Alert {
     public String getName() { return mName; }
     public STATUS getStatus() {return mStatus;}
     public void setStatus(STATUS status) {mStatus = status;}
+    public String getType() {return mType;}
 
     public Date getDate() {
         Date dateFor;
@@ -83,6 +90,7 @@ public class Alert {
 
         return new Alert(data.getString(data.getColumnIndex(Store.COLUMN_NAME)),
                 data.getString(data.getColumnIndex(Store.COLUMN_DESCRIPTION)),
+                data.getString(data.getColumnIndex(Store.COLUMN_TYPE)),
                 data.getInt(data.getColumnIndex(Store.COLUMN_ALERT_ID)),
                 data.getString(data.getColumnIndex(Store.COLUMN_DATE)),
                 duration,
@@ -101,6 +109,7 @@ public class Alert {
 
         public static final String COLUMN_NAME = "name";
         public static final String COLUMN_DESCRIPTION = "description";
+        public static final String COLUMN_TYPE= "type";
         public static final String COLUMN_ALERT_ID = "alert_id";
         public static final String COLUMN_DATE = "date";
         public static final String COLUMN_DURATION = "duration";
@@ -116,6 +125,7 @@ public class Alert {
                         + _ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                         + COLUMN_NAME + " TEXT NOT NULL, "
                         + COLUMN_DESCRIPTION + " TEXT, "
+                        + COLUMN_TYPE + " TEXT, "
                         + COLUMN_ALERT_ID+ " INTEGER, "
                         + COLUMN_DATE + " TEXT NOT NULL, "
                         + COLUMN_DURATION + " TEXT, "
@@ -128,7 +138,7 @@ public class Alert {
         /* query methods */
         public static Cursor fetchAllAlerts(SQLiteDatabase db) {
             String[] columns = new String[] {
-                    _ID,  COLUMN_NAME,COLUMN_DESCRIPTION,COLUMN_ALERT_ID, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
+                    _ID,  COLUMN_NAME,COLUMN_DESCRIPTION,COLUMN_TYPE,COLUMN_ALERT_ID, COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
                     COLUMN_LAT_END, COLUMN_LON_END, COLUMN_STATUS};
 
             return db.query(TABLE_NAME, columns, null, null, null, null, COLUMN_DATE);
@@ -136,7 +146,7 @@ public class Alert {
 
         public static Cursor fetchAlerts(SQLiteDatabase db, STATUS status) {
             String[] columns = new String[] {
-                    _ID, COLUMN_NAME, COLUMN_DESCRIPTION,COLUMN_ALERT_ID,COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
+                    _ID, COLUMN_NAME, COLUMN_DESCRIPTION,COLUMN_TYPE,COLUMN_ALERT_ID,COLUMN_DATE, COLUMN_DURATION, COLUMN_LAT_START, COLUMN_LON_START,
                     COLUMN_LAT_END, COLUMN_LON_END, COLUMN_STATUS};
             return db.query(TABLE_NAME,
                     columns,
@@ -157,6 +167,7 @@ public class Alert {
             ContentValues values = new ContentValues();
             values.put(COLUMN_NAME, alert.mName);
             values.put(COLUMN_DESCRIPTION, alert.mDescription);
+            values.put(COLUMN_TYPE, alert.mType);
             values.put(COLUMN_ALERT_ID, alert.mAlertID);
             values.put(COLUMN_DATE, alert.mDate);
             values.put(COLUMN_DURATION, alert.mDuration);

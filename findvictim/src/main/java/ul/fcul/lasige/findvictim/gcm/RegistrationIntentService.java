@@ -80,6 +80,7 @@ public class RegistrationIntentService extends IntentService {
             final String email = intent.getStringExtra(EXTRA_EMAIL);
             sendRegistrationToServer(locale, mac, email, token);
 
+
             // [END register_for_gcm]
         } catch (Exception e) {
             Log.d(TAG, "Failed to complete token refresh", e);
