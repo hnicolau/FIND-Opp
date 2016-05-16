@@ -352,7 +352,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
         Log.d(TAG, "Location Lat: " + message.LocationLatitude + " Lon: " + message.LocationLongitude + " Acc: " + message.LocationAccuracy + " Time: " + message.LocationTimestamp);
 
         // if it is the first time we have location
-        if (TokenStore.isFirstLocation(getApplicationContext()) && !mManualStart) {
+      /*  if (TokenStore.isFirstLocation(getApplicationContext()) && !mManualStart) {
 
             // if it is a valid location
             if (message.LocationLongitude != 0 && message.LocationLatitude != 0) {
@@ -382,7 +382,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
                 cursor.close();
             }
-        }
+        }*/
 
         // if we reached this point it is because either: 1) we don't know our location or 2) we are inside the alert area
 

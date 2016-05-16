@@ -1,10 +1,14 @@
 package ul.fcul.lasige.findvictim.ui;
 
+import android.app.NotificationManager;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.TextView;
 
 import com.example.unzi.offlinemaps.TilesProvider;
@@ -14,6 +18,8 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polygon;
+import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
@@ -22,17 +28,16 @@ import com.google.android.gms.maps.model.TileOverlayOptions;
 import ul.fcul.lasige.findvictim.R;
 import ul.fcul.lasige.findvictim.data.Alert;
 import ul.fcul.lasige.findvictim.data.DatabaseHelper;
+import ul.fcul.lasige.findvictim.gcm.GcmScheduler;
 
-public class AlertActivity extends FragmentActivity implements OnMapReadyCallback {
+public class AlertActivity extends FragmentActivity  {
 
     private GoogleMap mMap;
-
+    private Alert mAlert;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_alert);
-
-
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -43,11 +48,23 @@ public class AlertActivity extends FragmentActivity implements OnMapReadyCallbac
 
         startTileProvider(mMap);
 
-        Alert alert = (Alert) getIntent().getSerializableExtra("Alert");
-        if(alert==null)
-            alert = getActiveAlert();
-        if(alert!=null)
-            setAlertParameters(alert);
+        mAlert = (Alert) getIntent().getSerializableExtra("Alert");
+        if(mAlert==null)
+            mAlert = getActiveAlert();
+        if(mAlert!=null)
+            setAlertBounds();
+
+        //check if location is known, if not prompt the user to tell us
+        if(getIntent().getBooleanExtra("knownLocation",false)){
+            findViewById(R.id.noLocationDialog).setVisibility(View.VISIBLE);
+        }else{
+            findViewById(R.id.alertDetails).setVisibility(View.VISIBLE);
+            if(mAlert!=null)
+                setAlertParameters();
+        }
+
+
+
     }
 
     //get our tile database provider
@@ -56,50 +73,51 @@ public class AlertActivity extends FragmentActivity implements OnMapReadyCallbac
         TilesProvider tilesProvider = new TilesProvider(mMap, path);
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-
-
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+    public void cancelNotification(){
+        NotificationManager mNotificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationManager.cancel(1);
+    }
+    public void outsideAlert(View v){
+        cancelNotification();
     }
 
-    public void setAlertParameters(Alert alertParameters) {
+    public void insideAlert(View v){
+        cancelNotification();
+        setAlertParameters();
+        findViewById(R.id.noLocationDialog).setVisibility(View.GONE);
+        findViewById(R.id.alertDetails).setVisibility(View.VISIBLE);
+        GcmScheduler.getInstance(getApplicationContext()).scheduleAlarm(getApplicationContext(),mAlert);
+    }
+
+    public void setAlertParameters( ) {
         TextView alertName = (TextView) findViewById(R.id.alertName);
         TextView alertType = (TextView) findViewById(R.id.alertType);
         TextView alertDescription = (TextView) findViewById(R.id.alertDescription);
         TextView alertDate = (TextView) findViewById(R.id.alertStartDate);
 
-        alertName.setText(alertParameters.getName()+ " -");
-        alertDescription.setText(alertParameters.getDescription());
-        alertType.setText( alertParameters.getType());
-        alertDate.setText(alertParameters.getDate()+"");
+        alertName.setText(mAlert.getName()+ " -");
+        alertDescription.setText(mAlert.getDescription());
+        alertType.setText( mAlert.getType());
+        alertDate.setText(mAlert.getDate()+"");
+    }
 
+    public void setAlertBounds(){
         Log.d("test", "teste");
-        PolylineOptions rectOptions = new PolylineOptions()
-                .add(new LatLng(alertParameters.getLatStart(), alertParameters.getLonStart()))
-                .add(new LatLng(alertParameters.getLatEnd(), alertParameters.getLonStart()))
-                .add(new LatLng(alertParameters.getLatEnd(), alertParameters.getLonEnd()))
-                .add(new LatLng(alertParameters.getLatStart(), alertParameters.getLonEnd()))
-                .add(new LatLng(alertParameters.getLatStart(), alertParameters.getLonStart()));
+        PolygonOptions rectOptions = new PolygonOptions()
+                .add(new LatLng(mAlert.getLatStart(), mAlert.getLonStart()))
+                .add(new LatLng(mAlert.getLatEnd(), mAlert.getLonStart()))
+                .add(new LatLng(mAlert.getLatEnd(), mAlert.getLonEnd()))
+                .add(new LatLng(mAlert.getLatStart(), mAlert.getLonEnd()))
+                .add(new LatLng(mAlert.getLatStart(), mAlert.getLonStart())).fillColor(R.color.transparent_gray);
 
-        LatLng focus = new LatLng(alertParameters.getLatStart(),  alertParameters.getLonEnd());
+        LatLng focus = midPoint(mAlert.getLatStart(),  mAlert.getLonStart(),mAlert.getLatEnd(), mAlert.getLonEnd() );
 
         mMap.moveCamera(CameraUpdateFactory.newLatLng(focus));
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
 
         // Get back the mutable Polyline
-        Polyline polyline = mMap.addPolyline(rectOptions);
+        Polygon polyline = mMap.addPolygon(rectOptions);
         polyline.setZIndex(100);
     }
 
@@ -115,5 +133,22 @@ public class AlertActivity extends FragmentActivity implements OnMapReadyCallbac
         }
         // check whether we are inside the alert area
         return  Alert.fromCursor(cursor);
+    }
+
+    public LatLng midPoint(double lat1,double lon1,double lat2,double lon2){
+
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        //convert to radians
+        lat1 = Math.toRadians(lat1);
+        lat2 = Math.toRadians(lat2);
+        lon1 = Math.toRadians(lon1);
+
+        double Bx = Math.cos(lat2) * Math.cos(dLon);
+        double By = Math.cos(lat2) * Math.sin(dLon);
+        double lat3 = Math.atan2(Math.sin(lat1) + Math.sin(lat2), Math.sqrt((Math.cos(lat1) + Bx) * (Math.cos(lat1) + Bx) + By * By));
+        double lon3 = lon1 + Math.atan2(By, Math.cos(lat1) + Bx);
+
+        return new LatLng(Math.toDegrees(lat3), Math.toDegrees(lon3));
     }
 }

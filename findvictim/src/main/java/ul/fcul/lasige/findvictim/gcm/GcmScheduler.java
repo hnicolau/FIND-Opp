@@ -103,26 +103,36 @@ public class GcmScheduler {
     }
 
     private void alertNotification(Context context, Alert alert, Alert.DANGER danger) {
-        int icon=0;
-        switch (danger){
-            case IN_LOCATION:
-                icon = R.drawable.warning_notification;
-                break;
-            case UNKNOWN:
-                icon = R.drawable.warning_notification_y;
-                break;
-            case NOT_IN_LOCATION:
-                icon = R.drawable.warning_notification_g;
-                break;
-        }
-        NotificationCompat.Builder mBuilder =
-                new NotificationCompat.Builder(context)
-                        .setSmallIcon(icon)
-                        .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
-                        .setContentText(alert.getDescription());
+
         // Creates an explicit intent for an Activity in your app
         Intent resultIntent = new Intent(context, AlertActivity.class);
         resultIntent.putExtra("Alert", alert);
+        resultIntent.putExtra("knownLocation",true);
+        NotificationCompat.Builder mBuilder =null;
+        
+        switch (danger){
+            case IN_LOCATION:
+                mBuilder = new NotificationCompat.Builder(context)
+                        .setSmallIcon(R.drawable.warning_notification)
+                        .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
+                        .setContentText(alert.getDescription());
+                resultIntent.putExtra("knownLocation",false);
+                break;
+            case UNKNOWN:
+                mBuilder = new NotificationCompat.Builder(context)
+                        .setSmallIcon(R.drawable.warning_notification_y)
+                        .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
+                        .setContentText(alert.getDescription()).setOngoing(true);
+                resultIntent.putExtra("knownLocation",true);
+                break;
+            case NOT_IN_LOCATION:
+                mBuilder = new NotificationCompat.Builder(context)
+                        .setSmallIcon(R.drawable.warning_notification_g)
+                        .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
+                        .setContentText(alert.getDescription());
+                resultIntent.putExtra("knownLocation",false);
+                break;
+        }
 
 
         // The stack builder object will contain an artificial back stack for the
@@ -194,7 +204,7 @@ public class GcmScheduler {
                 Log.d(TAG, "latitude:"+ lat);
 
                 if(lat==0){
-                    Log.d(TAG, "Unknowk ");
+                    Log.d(TAG, "Unknown");
 
                     alertNotification(applicationContext, alert, Alert.DANGER.UNKNOWN);
                     //prompt alert activity
