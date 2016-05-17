@@ -79,6 +79,9 @@ public class AlertActivity extends FragmentActivity  {
         mNotificationManager.cancel(1);
     }
     public void outsideAlert(View v){
+        setAlertParameters();
+        findViewById(R.id.noLocationDialog).setVisibility(View.GONE);
+        findViewById(R.id.alertDetails).setVisibility(View.VISIBLE);
         cancelNotification();
     }
 

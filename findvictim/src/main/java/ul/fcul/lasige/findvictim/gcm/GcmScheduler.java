@@ -109,7 +109,6 @@ public class GcmScheduler {
         resultIntent.putExtra("Alert", alert);
         resultIntent.putExtra("knownLocation",true);
         NotificationCompat.Builder mBuilder =null;
-        
         switch (danger){
             case IN_LOCATION:
                 mBuilder = new NotificationCompat.Builder(context)
