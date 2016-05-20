@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/FIND.iml" filepath="$PROJECT_DIR$/FIND.iml" />
+      <module fileurl="file://$PROJECT_DIR$/findalert/findalert.iml" filepath="$PROJECT_DIR$/findalert/findalert.iml" />
       <module fileurl="file://$PROJECT_DIR$/findvictim/findvictim.iml" filepath="$PROJECT_DIR$/findvictim/findvictim.iml" />
       <module fileurl="file://$PROJECT_DIR$/lib/lib.iml" filepath="$PROJECT_DIR$/lib/lib.iml" />
       <module fileurl="file://$PROJECT_DIR$/offlinemaps/offlinemaps.iml" filepath="$PROJECT_DIR$/offlinemaps/offlinemaps.iml" />

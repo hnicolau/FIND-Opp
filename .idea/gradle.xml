@@ -9,6 +9,7 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/findalert" />
             <option value="$PROJECT_DIR$/findvictim" />
             <option value="$PROJECT_DIR$/lib" />
             <option value="$PROJECT_DIR$/offlinemaps" />
@@ -19,6 +20,7 @@
         <option name="myModules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/findalert" />
             <option value="$PROJECT_DIR$/findvictim" />
             <option value="$PROJECT_DIR$/lib" />
             <option value="$PROJECT_DIR$/offlinemaps" />

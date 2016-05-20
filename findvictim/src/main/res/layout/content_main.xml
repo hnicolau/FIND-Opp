@@ -7,7 +7,7 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     app:layout_behavior="@string/appbar_scrolling_view_behavior"
-    tools:context="ul.fcul.lasige.findvictim.ui.MainActivity" tools:showIn="@layout/activity_main">
+    tools:context="ul.fcul.lasige.findvictim.MainActivity" tools:showIn="@layout/activity_main">
 
     <Button
         android:layout_width="wrap_content"
