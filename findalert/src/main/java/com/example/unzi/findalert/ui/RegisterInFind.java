@@ -3,8 +3,9 @@ package com.example.unzi.findalert.ui;
 import android.content.Context;
 import android.content.Intent;
 
+import com.example.unzi.findalert.data.Alert;
 import com.example.unzi.findalert.data.TokenStore;
-import com.example.unzi.findalert.interfaces.OnAlertReceived;
+import com.example.unzi.findalert.interfaces.OnAlert;
 import com.example.unzi.findalert.interfaces.OnRegisterComplete;
 
 import java.util.ArrayList;
@@ -18,11 +19,13 @@ public class RegisterInFind {
     private static RegisterInFind mSharedInstance;
     private Context mContext;
     private ArrayList<OnRegisterComplete> registerObservers;
-    private ArrayList<OnAlertReceived> alertObservers;
+    private ArrayList<OnAlert> alertObservers;
 
     private RegisterInFind (Context context){
         mContext=context;
-        alertObservers = new ArrayList<OnAlertReceived>();
+        alertObservers = new ArrayList<OnAlert>();
+        registerObservers = new ArrayList<OnRegisterComplete>();
+
     }
 
     public static RegisterInFind sharedInstance (Context context){
@@ -34,15 +37,18 @@ public class RegisterInFind {
     public void register(){
         boolean sentToken = TokenStore.isRegistered(mContext);
         if(!sentToken) {
-            mContext.startActivity(new Intent(mContext,MainActivity.class));
+            Intent myIntent = new Intent(mContext,MainActivity.class);
+            myIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            mContext.startActivity(myIntent);
         }
     }
 
-    public void observeOnAlert(OnAlertReceived onAlertReceived){
-         alertObservers.add(onAlertReceived);
+    public void observeOnAlert(OnAlert onAlert){
+         alertObservers.add(onAlert);
     }
-    public void unregisterOnAlert(OnAlertReceived onAlertReceived){
-        alertObservers.remove(onAlertReceived);
+    public void unregisterOnAlert(OnAlert onAlert){
+        alertObservers.remove(onAlert);
     }
 
     public void observeOnRegisterComplete(OnRegisterComplete onRegisterComplete){
@@ -52,9 +58,17 @@ public class RegisterInFind {
         registerObservers.remove(onRegisterComplete);
     }
 
-    public void receivedAlert(){
-        for(OnAlertReceived alert :alertObservers)
-            alert.onAlertReceived();
+    public void receivedAlert(Alert mAlert, boolean isInside){
+        for(OnAlert alert :alertObservers)
+            alert.onAlertReceived(mAlert,isInside);
+    }
+    public void startAlert(int alertID){
+        for(OnAlert alert :alertObservers)
+            alert.onAlertStart(alertID);
+    }
+    public void stopAlert(int alertID){
+        for(OnAlert alert :alertObservers)
+            alert.onAlertStop(alertID);
     }
 
     public void registerCompleted(){

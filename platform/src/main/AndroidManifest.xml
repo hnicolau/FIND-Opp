@@ -22,7 +22,7 @@
 
         <!-- ACTIVITIES -->
         <activity
-            android:name="ul.fcul.lasige.find.MainActivity"
+            android:name="ul.fcul.lasige.find.ui.MainActivity"
             android:label="@string/title_activity_main"
             android:screenOrientation="portrait" >
             <intent-filter>

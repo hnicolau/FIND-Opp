@@ -17,6 +17,8 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.util.Base64;
 import android.util.Log;
 
+import com.example.unzi.findalert.ui.RegisterInFind;
+
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,12 +33,12 @@ import ul.fcul.lasige.find.lib.data.Packet;
 import ul.fcul.lasige.find.lib.data.PacketObserver;
 import ul.fcul.lasige.find.lib.service.FindConnector;
 import ul.fcul.lasige.findvictim.R;
-import ul.fcul.lasige.findvictim.data.Alert;
-import ul.fcul.lasige.findvictim.data.DatabaseHelper;
 import ul.fcul.lasige.findvictim.data.Message;
 import ul.fcul.lasige.findvictim.data.MessageGenerator;
 import ul.fcul.lasige.findvictim.data.TokenStore;
+import ul.fcul.lasige.findvictim.gcm.ReceiverGCM;
 import ul.fcul.lasige.findvictim.network.ConnectivityChangeReceiver;
+import ul.fcul.lasige.findvictim.utils.DeviceUtils;
 import ul.fcul.lasige.findvictim.utils.NetworkUtils;
 import ul.fcul.lasige.findvictim.utils.PositionUtils;
 import ul.fcul.lasige.findvictim.webservices.RequestServer;
@@ -82,6 +84,10 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
     //boolean that allows the service to run even without alert.
     private boolean mManualStart = true;
+
+    //gcm
+    private ReceiverGCM mReceiverGCM;
+
 
     /*
      * EXTERNAL API
@@ -134,6 +140,12 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
 
     @Override
     public void onCreate() {
+        //register gcm and select server
+        RegisterInFind findRegister = RegisterInFind.sharedInstance(this);
+        mReceiverGCM = new ReceiverGCM(this);
+        findRegister.register();
+
+
         mHandlerThread = new HandlerThread(TAG);
         mHandlerThread.start();
         mStateHandler = new Handler(mHandlerThread.getLooper());
@@ -244,7 +256,7 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     public void activateSensors(boolean manualStart) {
         mManualStart = manualStart;
         if (!isActivated()) {
-            WebLogging.logMessage(this, "started sensors", TokenStore.getMacAddress(this), "FindVictim");
+            WebLogging.logMessage(this, "started sensors", DeviceUtils.getWifiMacAddress(), "FindVictim");
             scheduleStateTransition(SensorsState.RUNNING);
         }
     }
@@ -322,7 +334,6 @@ public class SensorsService extends Service implements PacketObserver.PacketCall
     private void startSensors() {
         Log.d(TAG, "Starting sensors");
         mSensorManager.startAllSensors();
-        TokenStore.setIsFirstLocation(getApplicationContext(), true);
     }
 
     private void stopSensors() {

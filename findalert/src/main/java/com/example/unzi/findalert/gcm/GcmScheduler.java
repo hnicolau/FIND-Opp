@@ -18,6 +18,7 @@ import com.example.unzi.findalert.data.Alert;
 import com.example.unzi.findalert.data.DatabaseHelper;
 import com.example.unzi.findalert.sensors.LocationSensor;
 import com.example.unzi.findalert.ui.AlertActivity;
+import com.example.unzi.findalert.ui.RegisterInFind;
 import com.example.unzi.findalert.utils.DeviceUtils;
 import com.example.unzi.findalert.utils.PositionUtils;
 import com.example.unzi.findalert.webservice.WebLogging;
@@ -92,7 +93,7 @@ public class GcmScheduler {
         // Creates an explicit intent for an Activity in your app
         Intent resultIntent = new Intent(context, AlertActivity.class);
         resultIntent.putExtra("Alert", alert);
-        resultIntent.putExtra("knownLocation",true);
+
         NotificationCompat.Builder mBuilder =null;
         switch (danger){
             case IN_LOCATION:
@@ -100,21 +101,24 @@ public class GcmScheduler {
                         .setSmallIcon(R.drawable.warning_notification)
                         .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
                         .setContentText(alert.getDescription());
-                resultIntent.putExtra("knownLocation",false);
+                resultIntent.putExtra("knownLocation",true);
+                resultIntent.putExtra("isInside",true);
                 break;
             case UNKNOWN:
                 mBuilder = new NotificationCompat.Builder(context)
                         .setSmallIcon(R.drawable.warning_notification_y)
                         .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
                         .setContentText(alert.getDescription()).setOngoing(true);
-                resultIntent.putExtra("knownLocation",true);
+                resultIntent.putExtra("knownLocation",false);
                 break;
             case NOT_IN_LOCATION:
                 mBuilder = new NotificationCompat.Builder(context)
                         .setSmallIcon(R.drawable.warning_notification_g)
                         .setContentTitle(alert.getName()+" at " +alert.getDate().getHours() + ":" +alert.getDate().getMinutes()  )
                         .setContentText(alert.getDescription());
-                resultIntent.putExtra("knownLocation",false);
+                resultIntent.putExtra("knownLocation",true);
+                resultIntent.putExtra("isInside",false);
+
                 break;
         }
 
@@ -160,6 +164,7 @@ public class GcmScheduler {
 
             // stop sensors service
             //TODO create onStop
+            RegisterInFind.sharedInstance(context).stopAlert(alertID);
            /* VictimApp app = (VictimApp) context.getApplicationContext();
             app.stopSensors();*/
         }
@@ -228,16 +233,17 @@ public class GcmScheduler {
 
             if (intent != null) {
                 String action = intent.getAction();
-
+                int alertID= intent.getIntExtra(EXTRA_ALERT_ID,0);
                 if (action != null && action.equalsIgnoreCase(ACTION_SCHEDULE_START)) {
                     Log.d(TAG, "Received alarm to start sensors");
 
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
-                            intent.getIntExtra(EXTRA_ALERT_ID, 0), Alert.STATUS.ONGOING);
+                            alertID, Alert.STATUS.ONGOING);
 
                     // start sensors service
                    //TODO ON RECEIVE ALERT START
+                    RegisterInFind.sharedInstance(context).startAlert(alertID);
                    /* VictimApp app = (VictimApp) context.getApplicationContext();
                     app.starSensors();*/
 
@@ -246,10 +252,12 @@ public class GcmScheduler {
 
                     // update alert status
                     Alert.Store.updateAlertStatus(DatabaseHelper.getInstance(context).getWritableDatabase(),
-                            intent.getIntExtra(EXTRA_ALERT_ID, 0), Alert.STATUS.STOPPED);
+                            alertID, Alert.STATUS.STOPPED);
 
                     // stop sensors service
                     //TODO ONRECEIVE ALERT STOP
+                    RegisterInFind.sharedInstance(context).stopAlert(alertID);
+
                    /* VictimApp app = (VictimApp) context.getApplicationContext();
                     app.stopSensors();*/
                 }

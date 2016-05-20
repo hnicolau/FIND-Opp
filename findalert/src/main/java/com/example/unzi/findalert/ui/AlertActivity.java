@@ -26,6 +26,7 @@ public class AlertActivity extends FragmentActivity  {
 
     private GoogleMap mMap;
     private Alert mAlert;
+    private boolean mIsInside;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,18 +42,23 @@ public class AlertActivity extends FragmentActivity  {
         startTileProvider(mMap);
 
         mAlert = (Alert) getIntent().getSerializableExtra("Alert");
+         mIsInside =  getIntent().getBooleanExtra("isInside",false);
+
         if(mAlert==null)
             mAlert = getActiveAlert();
         if(mAlert!=null)
             setAlertBounds();
 
         //check if location is known, if not prompt the user to tell us
-        if(getIntent().getBooleanExtra("knownLocation",false)){
+        if(!getIntent().getBooleanExtra("knownLocation",false)){
             findViewById(R.id.noLocationDialog).setVisibility(View.VISIBLE);
         }else{
             findViewById(R.id.alertDetails).setVisibility(View.VISIBLE);
             if(mAlert!=null)
                 setAlertParameters();
+
+            //send alert received
+            RegisterInFind.sharedInstance(this).receivedAlert(mAlert, mIsInside);
         }
 
 
@@ -75,6 +81,8 @@ public class AlertActivity extends FragmentActivity  {
         findViewById(R.id.noLocationDialog).setVisibility(View.GONE);
         findViewById(R.id.alertDetails).setVisibility(View.VISIBLE);
         cancelNotification();
+        RegisterInFind.sharedInstance(this).receivedAlert(mAlert, false);
+
     }
 
     public void insideAlert(View v){
@@ -83,6 +91,8 @@ public class AlertActivity extends FragmentActivity  {
         findViewById(R.id.noLocationDialog).setVisibility(View.GONE);
         findViewById(R.id.alertDetails).setVisibility(View.VISIBLE);
         GcmScheduler.getInstance(getApplicationContext()).scheduleAlarm(getApplicationContext(),mAlert);
+        RegisterInFind.sharedInstance(this).receivedAlert(mAlert, true);
+
     }
 
     public void setAlertParameters( ) {
