@@ -97,7 +97,7 @@ public class PacketCommManager implements NeighborObserver.NeighborCallback, Pac
      */
     public void schedulePendingPackets(Neighbor neighbor) {
         // for all new packets
-        for(Long packetId : mPacketRegistry.getPacketsIdsSince(neighbor.getTimeLastPacket())) {
+        for(Long packetId : mPacketRegistry.getOutgoingPacketsIdsSince(neighbor.getTimeLastPacket())) {
             if (neighbor.hasLastSeenNetwork()) {
                 // neighbor is in a WiFi network
                 mBeaconingManager.setWifiConnectionLocked(true);

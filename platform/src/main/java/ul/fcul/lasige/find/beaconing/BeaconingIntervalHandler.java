@@ -52,12 +52,12 @@ public class BeaconingIntervalHandler extends InterruptibleFailsafeRunnable
     /**
      * Maximum beacon duration, 1 minute. After this time, the beaconing period ends.
      */
-    public static final int MAX_BEACONING_DURATION = 60 * 1000; // 1 minute
+    public static final int MAX_BEACONING_DURATION = 60 * 1000; // 10 minute
 
     /**
      * Timeout each beaconing slot, 15 seconds
      */
-    private static final int WIFI_SWITCH_TIMEOUT = 15 * 1000; // 15 seconds
+    private static final int WIFI_SWITCH_TIMEOUT = 30* 1000; // changed from 15 seconds to 30
     /**
      * Maximum number of beaconing slots, 4
      */

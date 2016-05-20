@@ -22,13 +22,16 @@ public class Packet {
     private final byte[] mSourceNode;
     // serialized data
     private final byte[] mData;
+    //endpoint
+    private final byte[] mHashProtocol;
 
     // constructor
-    public Packet(long packetId, long timeReceived, byte[] sourceNode, byte[] data){
+    public Packet(long packetId, long timeReceived, byte[] sourceNode, byte[] data, byte[] hashProtocol){
         mPacketId = packetId;
         mTimeReceived = timeReceived;
         mSourceNode = sourceNode;
         mData = data;
+        mHashProtocol =hashProtocol;
     }
 
     /**
@@ -67,6 +70,12 @@ public class Packet {
     public byte[] getData() { return mData; }
 
     /**
+     * Retrieves the packet ID.
+     * @return Packet ID.
+     */
+    public  byte [] getPacketProtocol() { return mHashProtocol; }
+
+    /**
      * Return a Packet object from a data cursor. This method is useful to build new packet when
      * querying the FIND service via ContentResolver.
      *
@@ -84,6 +93,8 @@ public class Packet {
                 data.getLong(data.getColumnIndex(Packets._ID)),
                 data.getLong(data.getColumnIndex(Packets.COLUMN_TIME_RECEIVED)),
                 sourceNode,
-                data.getBlob(data.getColumnIndex(Packets.COLUMN_DATA)));
+                data.getBlob(data.getColumnIndex(Packets.COLUMN_DATA)),
+                data.getBlob(data.getColumnIndex(Packets.COLUMN_PROTOCOL))
+                );
     }
 }

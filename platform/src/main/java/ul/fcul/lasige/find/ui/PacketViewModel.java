@@ -117,6 +117,7 @@ public class PacketViewModel {
         final byte[] protocol = data.getBlob(data.getColumnIndexOrThrow(FullContract.Packets.COLUMN_PROTOCOL));
         final byte[] payload = data.getBlob(data.getColumnIndexOrThrow(FullContract.Packets.COLUMN_DATA));
         final long ttl = data.getLong(data.getColumnIndexOrThrow(FullContract.Packets.COLUMN_TTL));
+        final long sync = data.getLong(data.getColumnIndexOrThrow(FullContract.Packets.COLUMN_SYNCHRONIZED));
 
         final Set<FullContract.PacketQueues> queues = new HashSet<>();
         long currentId = packetId;

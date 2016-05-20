@@ -220,6 +220,32 @@ public class PacketRegistry {
     }
 
     /**
+     * Registers an outgoing packet to be send to neighbors.
+     * @return Packet id in database or 0 if an error occurred.
+     */
+    public long registerDownloadedPacket(byte []data,byte [] protocolHash, long ttl) {
+        // synch access
+        synchronized (LOCK) {
+            // insert and get id
+            final long packetId = mDbController.insertDownloadedPacket(data, protocolHash, ttl);
+            if (packetId > 0) {
+                // success!
+                mUnencryptedBroadcastingPackets.add(packetId);
+
+                // get packet from database
+                TransportPacketOrBuilder packet = mDbController.getPacket(packetId);
+                for (PacketAddedCallback callback : mCallbacks) {
+                    // notify callbacks
+                    callback.onOutgoingPacketAdded(packet, packetId);
+                }
+            }
+            return packetId;
+        }
+    }
+
+
+
+    /**
      * Retrieves a set of packet ids that should be sent to a given neighbor. These include all
      * forwarding packets, broadcasting packets (not encrypted or with a target), and all packets with
      * protocols supported by the neighbor. Duplicate packets are included only once.
@@ -254,8 +280,22 @@ public class PacketRegistry {
      * @return Outgoing packets' ids.
      */
     // TODO use outgoing map instead of access DB similarly to getInterestingPacketIds
-    public Set<Long> getPacketsIdsSince(long timestamp) {
+    public Set<Long> getOutgoingPacketsIdsSince(long timestamp) {
         Cursor cursor = mDbController.getOutgoingPackets(timestamp);
+        Set<Long> ids = new HashSet<>();
+        while (cursor.moveToNext()) {
+            ids.add(Packet.fromCursor(cursor).getPacketId());
+        }
+        return ids;
+    }
+
+    /**
+     * Retrieves all  packets' ids existing in the platform since a given timestamp.
+     * @param timestamp Timestamp.
+     * @return Outgoing packets' ids.
+     */
+    public Set<Long> getAllPacketsIdsSince(long timestamp) {
+        Cursor cursor = mDbController.getAllPackets(timestamp);
         Set<Long> ids = new HashSet<>();
         while (cursor.moveToNext()) {
             ids.add(Packet.fromCursor(cursor).getPacketId());

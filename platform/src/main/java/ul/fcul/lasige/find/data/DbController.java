@@ -16,6 +16,7 @@ import android.util.Log;
 
 import com.google.protobuf.ByteString;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -76,11 +77,11 @@ public class DbController {
         // query id
         final Cursor appCursor = db.query(
                 FullContract.Apps.TABLE_NAME,
-                new String[] {
+                new String[]{
                         FullContract.Apps._ID
                 },
                 FullContract.Apps.COLUMN_APP_TOKEN + " = ?",
-                new String[] {
+                new String[]{
                         appToken
                 },
                 null, null, null, "1");
@@ -238,6 +239,37 @@ public class DbController {
     }
 
     /**
+     * Client Implementations
+     */
+    /**
+     * Retrieves {@link ClientImplementation} from a given client application's token.
+     * @return {@link ClientImplementation} object.
+     */
+    public ClientImplementation getImplementation(long protocol, long appId) {
+            ClientImplementation implementation = null;
+
+            // get read access
+            final SQLiteDatabase db = mDbHelper.getReadableDatabase();
+            // get data cursor from table
+            final Cursor cursor = db.query(
+                    ClientImplementations.VIEW_NAME_FULL_DETAILS,
+                    ClientImplementations.PROJECTION_DEFAULT,
+                    ClientImplementations.COLUMN_PROTOCOL_ID + " =? and " +ClientImplementations.COLUMN_APP_ID + " = ?" ,
+                    new String[] {
+                            protocol+"", appId+""
+                    },
+                    null, null, null, "1");
+
+            if (cursor.moveToFirst()) {
+                // we have a client implementation! create from cursor
+                implementation = ClientImplementation.fromCursor(cursor);
+            }
+
+            cursor.close();
+            return implementation;
+        }
+
+    /**
      * Retrieves {@link ClientImplementation} from a given client application's DB id.
      * @param id Database ID.
      * @return A {@link ClientImplementation} object.
@@ -333,23 +365,34 @@ public class DbController {
         try {
             // get client app id
             final long appId = getApplicationIdByToken(appToken);
+            Log.d(TAG, "Error while inserting implementation!"+ appId);
+
             if (appId > 0) {
                 // it exists! get protocol id
                 long protocolId = getProtocolIdByName(values.getString(FullContract.Protocols.COLUMN_IDENTIFIER));
 
                 if (protocolId < 0) {
+                    Log.e(TAG, "inserting new < 0 ");
+
                     // protocol does not previously exist, lets insert it
                     protocolId = insertProtocol(
                             values.getString(FullContract.Protocols.COLUMN_IDENTIFIER),
                             values.getBoolean(FullContract.Protocols.COLUMN_ENCRYPTED),
                             values.getBoolean(FullContract.Protocols.COLUMN_SIGNED),
+                            values.getString(FullContract.Protocols.COLUMN_ENDPOINT),
+                            values.getString(FullContract.Protocols.COLUMN_DOWNLOAD_ENDPOINT),
                             values.getInt(FullContract.Protocols.COLUMN_DEFAULT_TTL));
+                    Log.d(TAG, "client implementation id:" +protocolId);
                 }
 
                 if (protocolId > 0) {
+                    Log.e(TAG, "inserting new protocol id:" + protocolId + " appID:" + appId );
+
                     // either insert was successful, or it previously existed
                     // insert client implementation
                     final long implementationId = insertRawImplementation(appId, protocolId, 1);
+                    Log.e(TAG, "inserting new  implementationId:" + implementationId);
+
                     if (implementationId > 0) {
                         // success!
                         db.setTransactionSuccessful();
@@ -359,6 +402,10 @@ public class DbController {
                         mContext.getContentResolver().notifyChange(ClientImplementations.URI_ALL, null);
 
                         return getImplementation(implementationId);
+                    }else{
+                        mContext.getContentResolver().notifyChange(FullContract.Protocols.URI_ALL, null);
+                        mContext.getContentResolver().notifyChange(ClientImplementations.URI_ALL, null);
+                        return  getImplementation(protocolId, appId);
                     }
                 }
             }
@@ -404,6 +451,51 @@ public class DbController {
     }
 
     /**
+     * Protocols
+     */
+    /**
+     * Returns protocol's DB id given its name.
+     * @param hashcode Protocol name.
+     * @return Protocol's DB id. -1 if it does not exists.
+     */
+    public Cursor getProtocolEndpointByHash(byte [] hashcode) {
+        // get read access
+        final SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+        // protocol hash
+        final Cursor allProtocolCursor = db.query(
+                FullContract.Protocols.TABLE_NAME,
+                null,null,
+                null, null, null, null, null);
+
+        while (allProtocolCursor.moveToNext()) {
+           byte []hash = allProtocolCursor.getBlob(2);
+            if(Arrays.equals(hash,hashcode)){
+                return allProtocolCursor;
+            }
+
+        }
+       return null;
+    }
+
+    /**
+     * Retrieves a data cursor with all protocols.
+     * @return A data cursor.
+     * @see Cursor
+     */
+    public Cursor getProtocols() {
+        final SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+        return db.query(
+                FullContract.Protocols.TABLE_NAME,
+                null,
+                FullContract.Protocols.COLUMN_DOWNLOAD_ENDPOINT  +" is not null" , null, null, null,
+                null);
+    }
+
+
+
+    /**
      * Insert protocol.
      * @param name Protocol name.
      * @param encrypted Is encrypted?
@@ -411,7 +503,7 @@ public class DbController {
      * @param defaultTtl Time to live.
      * @return The row id of the newly inserted row, or -1 if an error occurred.
      */
-    private long insertProtocol(String name, Boolean encrypted, Boolean authenticated, Integer defaultTtl) {
+    private long insertProtocol(String name, Boolean encrypted, Boolean authenticated, String endpoint,String downloadEndpoint, Integer defaultTtl) {
         // build values structure
         final ContentValues values = new ContentValues();
         // name
@@ -426,6 +518,14 @@ public class DbController {
         // authenticated?
         if (authenticated != null) {
             values.put(FullContract.Protocols.COLUMN_SIGNED, authenticated);
+        }
+        // endpoint
+        if (endpoint != null) {
+            values.put(FullContract.Protocols.COLUMN_ENDPOINT, endpoint);
+        }
+        // download endpoint
+        if (downloadEndpoint != null) {
+            values.put(FullContract.Protocols.COLUMN_DOWNLOAD_ENDPOINT, downloadEndpoint);
         }
         // ttl
         if (defaultTtl != null) {
@@ -465,6 +565,8 @@ public class DbController {
             identityCursor.close();
         }
     }
+
+
 
     /**
      * Insert the platform's identify in the DB.
@@ -594,6 +696,22 @@ public class DbController {
     }
 
     /**
+     * Retrieves a data cursor with all  packets that were inserted since a given timestamp.
+     * @param sinceTimestamp Timestamp.
+     * @return A data cursor.
+     * @see Cursor
+     */
+    public Cursor getAllPackets(long sinceTimestamp) {
+        final SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+        return db.query(
+                Packets.TABLE_NAME,
+                null,
+                String.format(Packets.WHERE_CLAUSE_TIME_RECEIVED, sinceTimestamp),
+                null, null, null,null);
+    }
+
+    /**
      * Retrieves a data cursor with all outgoing packets that were inserted between two timestamps.
      * @param sinceTimestamp Start timestamp (inclusive).
      * @param untilTimestamp End timestamp (exclusive).
@@ -620,11 +738,13 @@ public class DbController {
      * @see PacketQueues
      */
     public long insertIncomingPacket(TransportPacket packet, PacketQueues[] queues) {
+        Log.d(TAG, "INSERTING INCOMING PACKETS!!!!!");
         // build values structure
         final ContentValues data = TransportPacketFactory.toContentValues(packet);
 
         // get protocol registry
         final ProtocolRegistry protocolRegistry = ProtocolRegistry.getInstance(mContext);
+        Log.d(TAG, "this is the proctocol when inserting:" +packet.getProtocol());
         // get client implements that use the protocol
         final Set<ClientImplementation> implementations =
                 protocolRegistry.getProtocolImplementations(packet.getProtocol().toByteArray());
@@ -662,12 +782,14 @@ public class DbController {
 
         // insert packet
         final long rowId = insertPacket(data, queues);
+        Log.d(TAG, "ROW ID:"+ rowId );
+
         if (rowId > 0) {
             // Notify listeners that a packet arrived
             for (ClientImplementation impl : implementations) {
                 final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
                 mContext.getContentResolver().notifyChange(notifyUri, null);
-                Log.v(TAG, "Notified URI " + notifyUri);
+                Log.v(TAG, "Notified URI  insertIncomingPacket" + notifyUri);
             }
         }
         return rowId;
@@ -682,6 +804,8 @@ public class DbController {
      * @see ContentValues
      */
     public long insertOutgoingPacket(ClientImplementation implementation, ContentValues data) {
+        Log.d(TAG, "INSERTING OUTGOING PACKETS!!!!!");
+
         // check if packet has data
         if (!data.containsKey(Packets.COLUMN_DATA)) {
             throw new IllegalArgumentException("Packet must contain data");
@@ -723,6 +847,63 @@ public class DbController {
     }
 
     /**
+     * Insert an outgoing packet into the DB. Data needs to be encrypted beforehand.
+     * @param data Data
+     * @return The id of the newly created row, or 0 if an error occurred.
+     * @see ClientImplementation
+     * @see ContentValues
+     */
+    public long insertDownloadedPacket(byte []  data, byte [] protocolHash, long ttl) {
+        Log.d(TAG, "INSERTING DOWNLOADED PACKETS!!!!!");
+
+        ContentValues cv = new ContentValues();
+        cv.put(Packets.COLUMN_DATA, data);
+        // set time received in minutes
+        cv.put(Packets.COLUMN_TIME_RECEIVED, System.currentTimeMillis() / 1000);
+        // set protocol hash
+        cv.put(Packets.COLUMN_PROTOCOL, protocolHash);
+        // set TTL
+        final long currentTime = System.currentTimeMillis() / 1000;
+        cv.put(Packets.COLUMN_TTL, ttl+currentTime);
+
+         // get protocol registry
+        final ProtocolRegistry protocolRegistry = ProtocolRegistry.getInstance(mContext);
+       final Set<ClientImplementation> implementations =
+                protocolRegistry.getProtocolImplementations(protocolHash);
+
+        // Notify listeners that a packet arrived
+      /* for (ClientImplementation impl : implementations) {
+            final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
+            mContext.getContentResolver().notifyChange(notifyUri, null);
+            Log.v(TAG, "Notified URI " + notifyUri);
+        }*/
+       // Log.d(TAG, "implementations: " + implementations.size());
+        // create packet
+        final TransportPacket packet = TransportPacketFactory.unsignedFromContentValues(cv);
+
+        // set packet hash
+        cv.put(Packets.COLUMN_PACKET_HASH, CryptoHelper.createDigest(packet.toByteArray()));
+
+        /*final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
+        mContext.getContentResolver().notifyChange(notifyUri, null);
+        return insertPacket(cv, new PacketQueues[] { PacketQueues.OUTGOING, PacketQueues.INCOMING });*/
+
+        // insert packet
+        final long rowId = insertPacket(cv, new PacketQueues[] { PacketQueues.OUTGOING, PacketQueues.INCOMING });
+        Log.d(TAG, "ROW ID:"+ rowId );
+
+        if (rowId > 0) {
+            // Notify listeners that a packet arrived
+            for (ClientImplementation impl : implementations) {
+                final Uri notifyUri = FindContract.buildProtocolUri(Packets.URI_INCOMING, impl.getToken());
+                mContext.getContentResolver().notifyChange(notifyUri, null);
+                Log.v(TAG, "Notified URI  insertIncomingPacket" + notifyUri);
+            }
+        }
+        return rowId;
+    }
+
+    /**
      * Insert packet in given packet queues (used internally).
      * @param packet Packet.
      * @param queues Queues.
@@ -731,6 +912,8 @@ public class DbController {
      * @see PacketQueues
      */
     private long insertPacket(ContentValues packet, PacketQueues[] queues) {
+        Log.d(TAG, "INSERTING PACKETS!!!!!");
+
         // get write access
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
         db.beginTransaction();
@@ -754,8 +937,6 @@ public class DbController {
                 }
 
                 db.setTransactionSuccessful();
-
-                // notify content resolvers
                 mContext.getContentResolver().notifyChange(Packets.URI_ALL, null);
                 mContext.getContentResolver().notifyChange(Packets.URI_OUTGOING, null);
                 return rowId;
@@ -769,25 +950,74 @@ public class DbController {
     }
 
     /**
-     * Delete packets where TTL is lower than a given timestamp.
+     * Delete packets where TTL is lower than a given timestamp  that were already synchronized
      * @param expirationTimestamp Timestamp
      * @return Number of deleted packets.
      */
     public int deleteExpiredPackets(long expirationTimestamp) {
         // TODO: clean up queues for android < 4.0 (e.g. select first, then batch-delete)
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        int expired=0;
         try {
+            Log.d(TAG, "Deleting expired:" + expirationTimestamp);
             // packets in queues are also deleted; queues are just views associated with Packets table
-            return db.delete(Packets.TABLE_NAME,
-                    Packets.WHERE_CLAUSE_EXPIRED,
-                    new String[]{
-                            String.valueOf(expirationTimestamp)
-                    });
+            expired = db.delete(Packets.TABLE_NAME,
+                   Packets.COLUMN_TTL + "<="+ expirationTimestamp +" AND " +  Packets.WHERE_CLAUSE_SYNCHRONIZED, null
+                    );
         } finally {
             // notify content resolvers
             mContext.getContentResolver().notifyChange(Packets.URI_ALL, null);
+            return expired;
         }
     }
+
+    /**
+     * Delete packets where TTL is lower than a given timestamp from the outgoing view
+     * @param expirationTimestamp Timestamp
+     * @return Number of deleted packets.
+     */
+    public void updateOutgoingView(long expirationTimestamp) {
+        final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        int expired=0;
+        try {
+
+            //get all expired packets and remove them from the package ongoing queue
+           Cursor cursor = db.query(Packets.VIEW_NAME_OUTGOING,
+                    new String []{Packets._ID}, Packets.COLUMN_TTL  +"<=" + expirationTimestamp , null, null, null, null);
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                int idExpired = cursor.getInt(0);
+                cursor.moveToNext();
+                db.delete(PacketQueues.TABLE_NAME,PacketQueues.COLUMN_PACKET_ID +" = "+ idExpired,null);
+            }
+            cursor.close();
+
+            //update the outgoing view
+            db.execSQL(FullContract.Packets.SQL_DROP_VIEW_OUTGOING);
+            db.execSQL(FullContract.Packets.SQL_CREATE_VIEW_OUTGOING);
+        } finally {
+            // notify content resolvers
+            mContext.getContentResolver().notifyChange(Packets.URI_OUTGOING, null);
+        }
+    }
+
+    /**
+     * Delete packets where TTL is lower than a given timestamp from the outgoing view
+     * @param expirationTimestamp Timestamp
+     * @return Number of deleted packets.
+     */
+    public void updateStaleView(long expirationTimestamp) {
+        final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        try {
+            //update the outgoing view
+            db.execSQL(FullContract.Packets.SQL_DROP_VIEW_STALE);
+            db.execSQL(Packets.SQL_CREATE_VIEW_STALE_PACKETS);
+        } finally {
+            // notify content resolvers
+            mContext.getContentResolver().notifyChange(Packets.URI_OUTGOING, null);
+        }
+    }
+
 
     /*
      * Neighbors
@@ -1368,5 +1598,14 @@ public class DbController {
         } finally {
             db.endTransaction();
         }
+    }
+
+    public void updateSyncPackets(long newSyncTime) {
+        final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        String updateQueryString = "update " + Packets.TABLE_NAME + " set " +
+                Packets.COLUMN_SYNCHRONIZED + " = " +
+                1 + " where " + Packets.COLUMN_TIME_RECEIVED + " < " + newSyncTime + " and "  +Packets.COLUMN_SYNCHRONIZED + " = "+0;
+
+        db.execSQL(updateQueryString);
     }
 }

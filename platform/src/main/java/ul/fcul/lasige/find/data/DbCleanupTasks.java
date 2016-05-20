@@ -36,15 +36,23 @@ public class DbCleanupTasks {
 
             // get current time in minutes
             final long currentTime = System.currentTimeMillis() / 1000;
-            // delete expired packets from database
-            final int deleteCount = dbController.deleteExpiredPackets(currentTime);
-            Log.v(TAG, String.format("Deleted %d packets with a TTL lower than %d", deleteCount, currentTime));
+                Log.d(TAG, "Deleting counting ");
 
-            // check whether packets were deleted
-            if(deleteCount > 0) {
-                // update packet registry
-                PacketRegistry.getInstance(mContext).fillPacketCaches();
-            }
+                // delete expired packets from database that were already synchronized
+                final int deleteCount = dbController.deleteExpiredPackets(currentTime);
+                Log.d(TAG, "Deleting count" + deleteCount);
+
+                 //remove expire packets from the outgoing view
+                 dbController.updateOutgoingView(currentTime);
+
+                //remove expire packets from the outgoing view
+                dbController.updateStaleView(currentTime);
+
+                Log.v(TAG, String.format("Deleted %d packets with a TTL lower than %d", deleteCount, currentTime));
+
+                    // update packet registry
+                    PacketRegistry.getInstance(mContext).fillPacketCaches();
+
 
             // reset timestamp of last packet sent to all neighbors in order to force
             // re-send of all packets when neighbor is reachable

@@ -1,6 +1,9 @@
 package ul.fcul.lasige.findvictim.ui;
 
+import android.Manifest;
 import android.accounts.AccountManager;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -10,10 +13,12 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -24,26 +29,23 @@ import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.example.unzi.findalert.ui.RegisterInFind;
 import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.common.AccountPicker;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 
+import java.util.Locale;
+
+import ul.fcul.lasige.find.lib.data.Packet;
+import ul.fcul.lasige.find.lib.data.PacketObserver;
 import ul.fcul.lasige.findvictim.R;
 import ul.fcul.lasige.findvictim.data.TokenStore;
-import ul.fcul.lasige.findvictim.gcm.RegistrationIntentService;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
+import ul.fcul.lasige.findvictim.utils.DeviceUtils;
 
 public class MainActivity extends AppCompatActivity implements SensorsService.Callback {
     private static final String TAG = MainActivity.class.getSimpleName();
-
-    // gcm
-    private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
-    private BroadcastReceiver mRegistrationBroadcastReceiver;
-
-    // server registration
-    private static final int REQUEST_CODE_EMAIL = 1;
-    private String mGoogleAccount;
 
     // sensor service
     private ServiceConnection mSensorsConnection;
@@ -52,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
     // ui
     private Button mToggleButton;
     private TextView mDescriptionView;
-    private View.OnClickListener mOnTryAgainListener;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,10 +63,12 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+
         mToggleButton = (Button) findViewById(R.id.toggleButton);
         mDescriptionView = (TextView) findViewById(R.id.descriptionView);
 
         final CoordinatorLayout coordinatorLayout = (CoordinatorLayout) findViewById(R.id.coordinatorLayout);
+
 
         mToggleButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -76,56 +80,13 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
                         mSensors.deactivateSensors();
                     }
                     else {
-                        mSensors.activateSensors();
+                        mSensors.activateSensors(true);
                     }
                     toggleState(!isActivated);
                 }
             }
         });
 
-        mOnTryAgainListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                registerGCM();
-            }
-        };
-
-        // google cloud messaging (gcm)
-        mRegistrationBroadcastReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                boolean sentToken = TokenStore.isRegistered(getApplicationContext());
-                if (sentToken) {
-                    Snackbar.make(coordinatorLayout, "Congratulations! The registration is complete", Snackbar.LENGTH_LONG).show();
-                } else {
-                    Log.d(TAG, "token not sent");
-                    Snackbar snack = Snackbar.make(coordinatorLayout, "Registration failed. Check your Internet connection",
-                            Snackbar.LENGTH_INDEFINITE);
-                    snack.setAction("Try again", mOnTryAgainListener);
-                    snack.show();
-                }
-            }
-        };
-
-        if (checkPlayServices()) {
-            // play services are installed
-
-            boolean sentToken = TokenStore.isRegistered(getApplicationContext());
-            if(!sentToken) {
-                // if not registered, then ask for google account
-                try {
-                    Intent intent = AccountPicker.newChooseAccountIntent(null,
-                            null,
-                            new String[]{GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE},
-                            false, null, null, null, null);
-                    // we need to wait for the result
-                    startActivityForResult(intent, REQUEST_CODE_EMAIL);
-                } catch (ActivityNotFoundException e) {
-                    mGoogleAccount = "noID";
-                    registerGCM();
-                }
-            }
-        }
 
         // start sensor service
         SensorsService.startSensorsService(this);
@@ -158,13 +119,11 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
     @Override
     protected void onResume() {
         super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(mRegistrationBroadcastReceiver,
-                new IntentFilter(TokenStore.KEY_REGISTRATION_COMPLETE));
+
     }
 
     @Override
     protected void onPause() {
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(mRegistrationBroadcastReceiver);
         super.onPause();
     }
 
@@ -191,58 +150,11 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
         mSensorsConnection = null;
     }
 
-    /**
-     * Check the device to make sure it has the Google Play Services APK. If
-     * it doesn't, display a dialog that allows users to download the APK from
-     * the Google Play Store or enable it in the device's system settings.
-     */
-    private boolean checkPlayServices() {
-        GoogleApiAvailability apiAvailability = GoogleApiAvailability.getInstance();
-        int resultCode = apiAvailability.isGooglePlayServicesAvailable(this);
-        if (resultCode != ConnectionResult.SUCCESS) {
-            if (apiAvailability.isUserResolvableError(resultCode)) {
-                apiAvailability.getErrorDialog(this, resultCode, PLAY_SERVICES_RESOLUTION_REQUEST)
-                        .show();
-            } else {
-                Log.i(TAG, "This device is not supported.");
-                finish();
-            }
-            return false;
-        }
-        return true;
-    }
 
-    /**
-     * Result from Google Account picker activity
-     * @param requestCode
-     * @param resultCode
-     * @param data
-     */
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_CODE_EMAIL && resultCode == RESULT_OK) {
-            String accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
-            mGoogleAccount = accountName;
-        } else {
-            mGoogleAccount= "noID";
-        }
-        Log.d(TAG, "Google account: " + mGoogleAccount);
-        registerGCM();
-    }
 
-    private void registerGCM() {
 
-        // get locale
-        String locale = getResources().getConfiguration().locale.getCountry();
 
-        // gets mac_address (user identification)
-        WifiManager manager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        WifiInfo info = manager.getConnectionInfo();
-        String mac= info.getMacAddress();
 
-        // Start IntentService to register this application with GCM.
-        RegistrationIntentService.startGCMRegistration(this, locale, mac, mGoogleAccount);
-    }
 
     /*
      * MENUS
@@ -278,4 +190,7 @@ public class MainActivity extends AppCompatActivity implements SensorsService.Ca
             }
         });
     }
+
+
+
 }

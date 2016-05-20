@@ -7,12 +7,12 @@ import android.provider.BaseColumns;
 import static com.google.common.collect.ObjectArrays.concat;
 
 /**
- *  This class contains all URIs, table names, SQL statements, and other constants to be used by the
- *  FIND content provider.
+ * This class contains all URIs, table names, SQL statements, and other constants to be used by the
+ * FIND content provider.
  *
  * @see android.content.ContentProvider
  * @see ContentResolver
- *
+ * <p/>
  * Created by hugonicolau on 04/11/2015.
  */
 public class FullContract {
@@ -130,14 +130,14 @@ public class FullContract {
 
         /**
          * The numeric id of the implementing app. This is a foreign key to the Apps table.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_APP_ID = "raw_app_id";
 
         /**
          * The numeric id of the implemented protocol. This is a foreign key to the Protocols table.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_PROTOCOL_ID = "raw_protocol_id";
@@ -145,14 +145,14 @@ public class FullContract {
         /**
          * The numeric id of the identity assigned to this implementation. This is a foreign key to
          * the Identities table.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_IDENTITY_ID = "raw_identity_id";
 
         /**
          * The token assigned to this implementation.
-         * <p>
+         * <p/>
          * Type: TEXT
          */
         public static final String COLUMN_TOKEN = "token";
@@ -187,6 +187,8 @@ public class FullContract {
                         + "P." + Protocols.COLUMN_IDENTIFIER + ", "
                         + "P." + Protocols.COLUMN_IDENTIFIER_HASH + ", "
                         + "P." + Protocols.COLUMN_ENCRYPTED + ", "
+                        + "P." + Protocols.COLUMN_ENDPOINT + ","
+                        + "P." + Protocols.COLUMN_DOWNLOAD_ENDPOINT + ","
                         + "P." + Protocols.COLUMN_SIGNED + ", "
                         + "P." + Protocols.COLUMN_DEFAULT_TTL + ", "
                         + "I." + Identities.COLUMN_PUBLICKEY + ", "
@@ -206,9 +208,9 @@ public class FullContract {
         public static final String[] PROJECTION_DEFAULT =
                 {
                         _ID, COLUMN_APP_ID, COLUMN_PROTOCOL_ID, COLUMN_TOKEN, Apps.COLUMN_PACKAGE_NAME,
-                        Protocols.COLUMN_IDENTIFIER, Protocols.COLUMN_IDENTIFIER_HASH,
-                        Protocols.COLUMN_ENCRYPTED, Protocols.COLUMN_SIGNED, Protocols.COLUMN_DEFAULT_TTL,
-                        Identities.COLUMN_PUBLICKEY, Identities.COLUMN_DISPLAY_NAME
+                        Protocols.COLUMN_IDENTIFIER, Protocols.COLUMN_IDENTIFIER_HASH, Protocols.COLUMN_ENDPOINT,
+                        Protocols.COLUMN_DOWNLOAD_ENDPOINT, Protocols.COLUMN_ENCRYPTED, Protocols.COLUMN_SIGNED,
+                        Protocols.COLUMN_DEFAULT_TTL, Identities.COLUMN_PUBLICKEY, Identities.COLUMN_DISPLAY_NAME
                 };
 
         /**
@@ -247,29 +249,43 @@ public class FullContract {
 
         /**
          * The unique, human readable protocol identifier.
-         * <p>
+         * <p/>
          * Type: TEXT
          */
         public static final String COLUMN_IDENTIFIER = "protocol_id";
 
         /**
          * The hash of the human readable protocol identifier.
-         * <p>
+         * <p/>
          * Type: BLOB (20 bytes)
          */
         public static final String COLUMN_IDENTIFIER_HASH = "hash";
 
         /**
          * If packets should be encrypted by default (leveraging the public key of the receiver).
-         * <p>
+         * <p/>
          * Type: BOOLEAN (as INTEGER)
          */
         public static final String COLUMN_ENCRYPTED = "encrypted";
 
         /**
+         * If packets have a endpoint destination null by default (.
+         * <p/>
+         * Type: TEXT
+         */
+        public static final String COLUMN_ENDPOINT = "endpoint";
+
+        /**
+         * If the protocol has a endpoint where the platform should retrieve data
+         * <p/>
+         * Type: TEXT
+         */
+        public static final String COLUMN_DOWNLOAD_ENDPOINT = "download_endpoint";
+
+        /**
          * If packets should be signed by default (leveraging the own public key). Turn this off to
          * enable incognito operation (no sender node will be set).
-         * <p>
+         * <p/>
          * Type: BOOLEAN (as INTEGER)
          */
         public static final String COLUMN_SIGNED = "signed";
@@ -278,7 +294,7 @@ public class FullContract {
          * The default TTL (in seconds) packets of this protocol should have, relative to the time a
          * packet is being sent (e.g., 3600 for a default TTL of X+1h). A "null" value means
          * "no default", hence none is set for such packets.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_DEFAULT_TTL = "default_ttl";
@@ -292,6 +308,8 @@ public class FullContract {
                         + COLUMN_IDENTIFIER + " text not null, "
                         + COLUMN_IDENTIFIER_HASH + " blob unique not null, "
                         + COLUMN_ENCRYPTED + " integer not null, "
+                        + COLUMN_ENDPOINT + " text, "
+                        + COLUMN_DOWNLOAD_ENDPOINT + " text, "
                         + COLUMN_SIGNED + " integer not null, "
                         + COLUMN_DEFAULT_TTL + " integer)";
 
@@ -300,7 +318,7 @@ public class FullContract {
          */
         public static final String[] PROJECTION_DEFAULT =
                 {
-                        _ID, COLUMN_IDENTIFIER, COLUMN_ENCRYPTED, COLUMN_SIGNED, COLUMN_DEFAULT_TTL
+                        _ID, COLUMN_IDENTIFIER, COLUMN_ENCRYPTED, COLUMN_ENDPOINT,COLUMN_DOWNLOAD_ENDPOINT, COLUMN_SIGNED, COLUMN_DEFAULT_TTL
                 };
 
         /**
@@ -343,21 +361,21 @@ public class FullContract {
 
         /**
          * The name of the key pair in the keystore.
-         * <p>
+         * <p/>
          * Type: TEXT
          */
         public static final String COLUMN_IDENTIFIER = "identity_id";
 
         /**
          * The public key of this identity.
-         * <p>
+         * <p/>
          * Type: BLOB
          */
         public static final String COLUMN_PUBLICKEY = "public_key";
 
         /**
          * The public display name associated to this identity.
-         * <p>
+         * <p/>
          * Type: TEXT
          */
         public static final String COLUMN_DISPLAY_NAME = "display_name";
@@ -405,7 +423,7 @@ public class FullContract {
 
     /**
      * Constants for the Packets table of the FIND data provider.
-     * <p>
+     * <p/>
      * This table offers 4 different views on the data:
      * <ul>
      * <li>INCOMING: All packets which can be handled by a protocol implementer on this device,
@@ -432,70 +450,83 @@ public class FullContract {
         public static final String VIEW_NAME_OUTGOING = "OutgoingPackets_View";
 
         /**
+         * The name of the table view for expired stored packets.
+         */
+        public static final String VIEW_NAME_STALE = "StalePackets_View";
+
+
+        /**
          * The name of the table view for all packets with their queues.
          */
         public static final String VIEW_NAME_ALL = "AllPackets_View";
 
         /**
          * The identifier of the node the packet originally came from.
-         * <p>
+         * <p/>
          * Type: BLOB
          */
         public static final String COLUMN_SOURCE_NODE = "source_node";
 
         /**
          * The identifier of the node the packet is finally targeted at.
-         * <p>
+         * <p/>
          * Type: BLOB
          */
         public static final String COLUMN_TARGET_NODE = "target_node";
 
         /**
          * The latest time when a packet should not be forwarded anymore, as a timestamp in UTC.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_TTL = "ttl";
 
         /**
          * The protocol this packet implements, as hash of the protocol name.
-         * <p>
+         * <p/>
          * Type: BLOB (20 bytes)
          */
         public static final String COLUMN_PROTOCOL = "protocol_hash";
 
         /**
          * The serialized (and possibly encrypted) data of the packet.
-         * <p>
+         * <p/>
          * Type: BLOB
          */
         public static final String COLUMN_DATA = "data";
 
         /**
          * The message authentication code (MAC) over the packet header and data.
-         * <p>
+         * <p/>
          * Type: BLOB
          */
         public static final String COLUMN_MAC = "mac";
 
         /**
          * If this packet should be encrypted before sending.
-         * <p>
+         * <p/>
          * Type: BOOLEAN (as INTEGER)
          */
         public static final String COLUMN_ENCRYPTED = "encrypted";
 
         /**
          * The time this packet was received by the platform, as a timestamp in UTC.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_TIME_RECEIVED = "time_received";
 
         /**
+         * If the packet was synchronized
+         * <p/>
+         * Type: BOOLEAN (as INTEGER)
+         */
+        public static final String COLUMN_SYNCHRONIZED = "synchronized";
+
+        /**
          * The hash of the packet. This field is only used on INSERTs together with a UNIQUE
          * constraint to prevent storing duplicate packets.
-         * <p>
+         * <p/>
          * Type: BLOB (20 bytes)
          */
         public static final String COLUMN_PACKET_HASH = "packet_hash";
@@ -513,8 +544,40 @@ public class FullContract {
                         + COLUMN_DATA + " blob not null, "
                         + COLUMN_MAC + " blob, "
                         + COLUMN_ENCRYPTED + " integer default 0, "
+                        + COLUMN_SYNCHRONIZED + " integer default 0, "
                         + COLUMN_TIME_RECEIVED + " integer, "
                         + COLUMN_PACKET_HASH + " blob unique not null)";
+        /**
+         * The WHERE clause format string used when retrieving a single packet.
+         */
+        public static final String WHERE_CLAUSE_ITEM = _ID + " = %s";
+
+        /**
+         * The WHERE clause format string used to filter by protocol hash.
+         */
+        public static final String WHERE_CLAUSE_PROTOCOL = DbHelper.buildBinaryWhere(COLUMN_PROTOCOL);
+
+        /**
+         * The WHERE clause format string used to filter by expired TTL.
+         */
+        public static final String WHERE_CLAUSE_EXPIRED = COLUMN_TTL + " >= ";
+
+        /**
+         * The WHERE clause format string used to filter packets synchronized.
+         */
+        public static final String WHERE_CLAUSE_SYNCHRONIZED = COLUMN_SYNCHRONIZED + " =  1";
+
+
+        /**
+         * The WHERE clause used when retrieving recent packets.
+         */
+        public static final String WHERE_CLAUSE_TIME_RECEIVED = COLUMN_TIME_RECEIVED + " >= %d";
+
+        /**
+         * The WHERE clause used when retrieving recent packets.
+         */
+        public static final String WHERE_CLAUSE_TIME_RECEIVED_UNTIL = COLUMN_TIME_RECEIVED + " >= %d" +
+                " and " + COLUMN_TIME_RECEIVED + " < %d";
 
         /**
          * The SQL statement to create the PacketQueues association table.
@@ -542,6 +605,7 @@ public class FullContract {
                         + COLUMN_DATA + ", "
                         + COLUMN_MAC + ", "
                         + COLUMN_ENCRYPTED + ", "
+                        + COLUMN_SYNCHRONIZED + ", "
                         + COLUMN_TIME_RECEIVED + ", "
                         + "Q." + PacketQueues.COLUMN_QUEUE;
 
@@ -555,6 +619,7 @@ public class FullContract {
                         + COLUMN_SOURCE_NODE + ", "
                         + COLUMN_PROTOCOL + ", "
                         + COLUMN_DATA + ", "
+                        + COLUMN_SYNCHRONIZED + ", "
                         + COLUMN_TIME_RECEIVED + " "
                         + SQL_JOIN_CONDITION
                         + " and Q." + PacketQueues.COLUMN_QUEUE
@@ -569,7 +634,16 @@ public class FullContract {
                         + SQL_COMMON_COLUMNS
                         + SQL_JOIN_CONDITION
                         + " and Q." + PacketQueues.COLUMN_QUEUE
-                        + " != " + PacketQueues.INCOMING.ordinal();
+                        + " != " + PacketQueues.INCOMING.ordinal()
+                        + " where " + WHERE_CLAUSE_EXPIRED + (System.currentTimeMillis() / 1000);
+        /**
+         * The SQL statement to drop the view on all outgoing packets (belonging to the OUTGOING
+         * or FORWARDING queue).
+         */
+        public static final String SQL_DROP_VIEW_OUTGOING =
+                "drop view " + VIEW_NAME_OUTGOING;
+
+
         /**
          * The SQL statement to create the view on all packets together with their queue.
          */
@@ -578,31 +652,23 @@ public class FullContract {
                         + SQL_COMMON_COLUMNS
                         + SQL_JOIN_CONDITION;
 
-        /**
-         * The WHERE clause format string used when retrieving a single packet.
-         */
-        public static final String WHERE_CLAUSE_ITEM = _ID + " = %s";
+        public static final String SQL_CREATE_VIEW_STALE_PACKETS =
+                "create view " + VIEW_NAME_STALE + " as select "
+                        + _ID + ", "
+                        + COLUMN_SOURCE_NODE + ", "
+                        + COLUMN_PROTOCOL + ", "
+                        + COLUMN_DATA + ", "
+                        + COLUMN_SYNCHRONIZED + ", "
+                        + COLUMN_TIME_RECEIVED
+                        + " from " + TABLE_NAME
+                        + " where " + Packets.COLUMN_TTL + "<="+ (System.currentTimeMillis()/ 1000) +" AND " +  Packets.COLUMN_SYNCHRONIZED + "=0";
 
         /**
-         * The WHERE clause format string used to filter by protocol hash.
+         * The SQL statement to drop the view on all outgoing packets (belonging to the OUTGOING
+         * or FORWARDING queue).
          */
-        public static final String WHERE_CLAUSE_PROTOCOL = DbHelper.buildBinaryWhere(COLUMN_PROTOCOL);
-
-        /**
-         * The WHERE clause format string used to filter by expired TTL.
-         */
-        public static final String WHERE_CLAUSE_EXPIRED = COLUMN_TTL + " <= ?";
-
-        /**
-         * The WHERE clause used when retrieving recent packets.
-         */
-        public static final String WHERE_CLAUSE_TIME_RECEIVED = COLUMN_TIME_RECEIVED + " >= %d";
-
-        /**
-         * The WHERE clause used when retrieving recent packets.
-         */
-        public static final String WHERE_CLAUSE_TIME_RECEIVED_UNTIL = COLUMN_TIME_RECEIVED + " >= %d" +
-                " and " + COLUMN_TIME_RECEIVED + " < %d";
+        public static final String SQL_DROP_VIEW_STALE =
+                "drop view " + VIEW_NAME_STALE;
 
         /**
          * A projection of the default columns in the packets table.
@@ -610,7 +676,7 @@ public class FullContract {
         public static final String[] PROJECTION_DEFAULT =
                 {
                         _ID, COLUMN_SOURCE_NODE, COLUMN_TARGET_NODE, COLUMN_DATA, COLUMN_TTL,
-                        COLUMN_PROTOCOL, COLUMN_MAC, COLUMN_ENCRYPTED, COLUMN_TIME_RECEIVED,
+                        COLUMN_PROTOCOL, COLUMN_MAC, COLUMN_ENCRYPTED, COLUMN_SYNCHRONIZED, COLUMN_TIME_RECEIVED,
                         PacketQueues.COLUMN_QUEUE
                 };
 
@@ -619,7 +685,7 @@ public class FullContract {
          */
         public static final String[] PROJECTION_DEFAULT_INCOMING =
                 {
-                        _ID, COLUMN_SOURCE_NODE, COLUMN_DATA, COLUMN_TIME_RECEIVED
+                        _ID, COLUMN_SOURCE_NODE,COLUMN_PROTOCOL,COLUMN_DATA, COLUMN_TIME_RECEIVED
                 };
 
         /**
@@ -666,6 +732,7 @@ public class FullContract {
                 ContentResolver.CURSOR_ITEM_BASE_TYPE + "/vnd." + AUTHORITY + ".packets";
     }
 
+
     /**
      * Constants for the PacketQueue table of the FIND data provider. This is merely a helper
      * table and can only sensibly be used in combination with a JOIN to the Packets table. This is
@@ -682,23 +749,23 @@ public class FullContract {
 
         /**
          * The numeric id of the packet. This is a foreign key to the Packets table.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_PACKET_ID = "raw_packet_id";
 
         /**
          * The queue this packet belongs to. Valid values are defined by the Queues enum.
-         * <p>
+         * <p/>
          * Type: TEXT
          */
         public static final String COLUMN_QUEUE = "queue";
 
+
         /**
          * CHECK constraint to ensure only valid values are written into the queue column.
          */
-        public static final String SQL_CHECK_CONSTRAINT =
-                DbHelper.buildCheckConstraint(COLUMN_QUEUE, PacketQueues.class);
+        public static final String SQL_CHECK_CONSTRAINT =DbHelper.buildCheckConstraint(COLUMN_QUEUE, PacketQueues.class);
 
         /**
          * Template for the SQL statement to create this table. In order to create this table, fill
@@ -712,6 +779,7 @@ public class FullContract {
                         + "foreign key (" + COLUMN_PACKET_ID + ")"
                         + " references %s(%s) on delete cascade)";
     }
+
 
     /**
      * Constants for the Neighbor table of the Find data provider. Each item represents exactly
@@ -728,56 +796,56 @@ public class FullContract {
 
         /**
          * The neighbor's public identifier, an Ed25519 public key.
-         * <p>
+         * <p/>
          * Type: BLOB
          */
         public static final String COLUMN_IDENTIFIER = "neighbor_id";
 
         /**
          * The last time this neighbor has been seen, as timestamp in UTC.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_TIME_LASTSEEN = "time_lastseen";
 
         /**
          * The last time we successfully sent a packet to this neighbor, as timestamp in UTC.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_TIME_LASTPACKET = "time_lastpacket";
 
         /**
          * If the neighbor is capable of receiving multicast beacons.
-         * <p>
+         * <p/>
          * Type: BOOLEAN (as INTEGER)
          */
         public static final String COLUMN_MULTICAST_CAPABLE = "is_multicast_capable";
 
         /**
          * The network name where this neighbor has been seen the last time.
-         * <p>
+         * <p/>
          * Type: TEXT
          */
         public static final String COLUMN_NETWORK = "network";
 
         /**
          * The neighbor's IPv4 address when it was last connected, as packed bytes.
-         * <p>
+         * <p/>
          * Type: BLOB (4 bytes)
          */
         public static final String COLUMN_IP4 = "ip4";
 
         /**
          * The neighbor's IPv6 address when it was last connected, as packed bytes.
-         * <p>
+         * <p/>
          * Type: BLOB (16 bytes)
          */
         public static final String COLUMN_IP6 = "ip6";
 
         /**
          * The neighbor's Bluetooth MAC address, as packed bytes.
-         * <p>
+         * <p/>
          * Type: BLOB (6 bytes)
          */
         public static final String COLUMN_BLUETOOTH = "bluetooth";
@@ -868,14 +936,14 @@ public class FullContract {
 
         /**
          * Foreign key to the ID in the neighbor table.
-         * <p>
+         * <p/>
          * Type: INTEGER
          */
         public static final String COLUMN_NEIGHBOR_ID = "raw_neighbor_id";
 
         /**
          * Hash of the protocol supported by the neighbor.
-         * <p>
+         * <p/>
          * Type: BLOB (20 bytes)
          */
         public static final String COLUMN_PROTOCOL_HASH = "protocol_hash";

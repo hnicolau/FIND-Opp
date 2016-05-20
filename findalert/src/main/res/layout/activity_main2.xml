@@ -1,0 +1,153 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:map="http://schemas.android.com/apk/res-auto"
+    android:layout_width="fill_parent"
+
+    android:layout_height="fill_parent"
+    android:orientation="vertical"
+    map:mapType="none">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#4153b5">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/alertDetails"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:onClick="isOnLocation">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceLarge"
+                    android:text="No active alerts"
+                    android:id="@+id/alertName"
+                    android:layout_marginLeft="5dp"
+                    android:textColor="#ffffff" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/alertType"
+                    android:layout_marginLeft="15dp"
+                    android:textColor="#ffffff" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:id="@+id/alertDescription"
+                    android:layout_marginTop="25dp"
+                    android:layout_marginLeft="5dp"
+                    android:textColor="#ffffff" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="25dp"
+                android:layout_marginLeft="5dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:id="@+id/alertStartDate"
+                    android:textColor="#ffffff" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/noLocationDialog"
+            android:background="#4052b5"
+            android:visibility="gone"
+            android:layout_marginTop="25dp">
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center">
+
+                <ImageView
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:id="@+id/imageView"
+                    android:src="@drawable/warning_notification_y" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceLarge"
+                    android:id="@+id/textview"
+                    android:text="Are you in this location?"
+                    android:layout_marginLeft="5dp"
+                    android:textColor="#ffffff" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginTop="10dp"
+                android:visibility="visible">
+
+                <Button
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No"
+                    android:id="@+id/button"
+                    android:textStyle="bold"
+                    android:onClick="outsideAlert"
+                    android:textColor="#ffffff"
+                    android:background="@color/button_material_dark"
+                    android:layout_marginRight="10dp" />
+
+                <Button
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Yes"
+                    android:id="@+id/button2"
+                    android:textStyle="bold"
+                    android:onClick="insideAlert"
+                    android:textColor="#ffffff"
+                    android:background="@color/button_material_dark"
+                    android:layout_marginLeft="10dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <fragment
+            android:id="@+id/map"
+            android:name="com.google.android.gms.maps.SupportMapFragment"
+            class="com.google.android.gms.maps.SupportMapFragment"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="25dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -5,6 +5,7 @@ import android.location.Location;
 
 import ul.fcul.lasige.findvictim.sensors.SensorManager;
 import ul.fcul.lasige.findvictim.sensors.SensorsService;
+import ul.fcul.lasige.findvictim.utils.DeviceUtils;
 
 /**
  * Created by hugonicolau on 26/11/15.
@@ -17,12 +18,14 @@ public class MessageGenerator {
         private final SensorManager mSensorsManager;
         private final SensorsService mSensorService;
         private final Context mContext;
+        private final String mMacAdress;
 
         public GenerateMessageTask(Context context, SensorManager sensormanager, SensorsService sensorsService) {
             super();
             mSensorsManager = sensormanager;
             mSensorService = sensorsService;
             mContext = context;
+            mMacAdress= DeviceUtils.getWifiMacAddress();
         }
 
         @Override
@@ -35,8 +38,7 @@ public class MessageGenerator {
 
             // build message
             Message message = new Message();
-            message.OriginMac = TokenStore.getMacAddress(mContext);
-            message.GoogleAccount = TokenStore.getGoogleAccount(mContext);
+            message.OriginMac = mMacAdress;
             message.TimeSent = System.currentTimeMillis();
             message.TimeReceived = -1;
             message.Battery = batteryLevel;

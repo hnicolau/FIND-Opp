@@ -107,6 +107,7 @@ public class ConnectorService extends Service
      */
     @Override
     public void onInternetConnection(boolean connected) {
+
         // notify all connected clients
         for (String clientApiKey : mConnectedClients.keySet()) {
             reply(clientApiKey, FindMessenger.MSG_INTERNET_CONNECTION, connected);
@@ -131,6 +132,7 @@ public class ConnectorService extends Service
         if (apiKey == null) {
             // this service does not work without API keys
             // give a chance for client app to request api key
+            Log.d(TAG, "API null while:" + msg.what);
             tryReplyToLetClientRequestApiKey(msg.replyTo);
             return true;
         } else {
@@ -155,6 +157,7 @@ public class ConnectorService extends Service
             case FindMessenger.MSG_REGISTER_CLIENT: {
                 final Messenger replyTo = msg.replyTo;
                 if (replyTo != null) {
+                    Log.d(TAG, "registering app name with apiKEy");
                     // register client application
                     // from now on, app will receive notifications about platform state and
                     // internet connectivity
@@ -171,9 +174,14 @@ public class ConnectorService extends Service
 
             // message received to register client app's protocol. Client app needs to be registered beforehand.
             case FindMessenger.MSG_REGISTER_PROTOCOL: {
+                final Messenger replyTo = msg.replyTo;
+
+                Log.d(TAG, "Received MSG PROTOCOL ON PLAT");
                 if (!extraData.isEmpty()) {
+                    Log.d(TAG, "EXTRA DATA NOT EMPTY");
+
                     // register protocol for the client application
-                    registerProtocol(apiKey, extraData);
+                    registerProtocol(apiKey, extraData, replyTo);
                 }
                 break;
             }
@@ -219,7 +227,7 @@ public class ConnectorService extends Service
             case FindMessenger.MSG_INTERNET_CONNECTION: {
                 Log.d(TAG, "client requested internet state");
                 // reply whether we currently have internet access
-                reply(apiKey, FindMessenger.MSG_INTERNET_CONNECTION, mSupervisor.getBeaconingManager().hasInternetAccess());
+                    reply(apiKey, FindMessenger.MSG_INTERNET_CONNECTION, mSupervisor.getBeaconingManager().hasInternetAccess());
             }
             default: {
                 Log.d(TAG, "received an unrecognized message");
@@ -260,11 +268,11 @@ public class ConnectorService extends Service
     /**
      * Registers protocol for given API key. Replies to client app to a unique protocol access token
      * that is required to publish data and require data updates.
-     *
-     * @param apiKey Client application's API key
+     *  @param apiKey Client application's API key
      * @param protocolDescription Protocol description.
+     * @param replyTo
      */
-    private void registerProtocol(String apiKey, Bundle protocolDescription) {
+    private void registerProtocol(String apiKey, Bundle protocolDescription, Messenger replyTo) {
         Log.d(TAG, "client app requested to register protocol");
         // get platform application
         final FindApp app = (FindApp) getApplication();
@@ -279,7 +287,7 @@ public class ConnectorService extends Service
             replyData.putString(FindMessenger.EXTRA_PROTOCOL_NAME, impl.getProtocolName());
             replyData.putString(FindMessenger.EXTRA_PROTOCOL_TOKEN, impl.getToken());
             // reply to client app (needs to be previously registered)
-            reply(apiKey, FindMessenger.MSG_REGISTER_PROTOCOL, replyData);
+            reply(apiKey, FindMessenger.MSG_REGISTER_PROTOCOL,null, replyData, replyTo);
         }
     }
 
@@ -290,7 +298,7 @@ public class ConnectorService extends Service
      * @param flag Boolean value.
      */
     private void reply(String apiKey, int msgCode, boolean flag) {
-        reply(apiKey, msgCode, flag, null);
+        reply(apiKey, msgCode, flag, null,null);
     }
 
     /**
@@ -300,7 +308,7 @@ public class ConnectorService extends Service
      * @param data Data structure.
      */
     private void reply(String apiKey, int msgCode, Bundle data) {
-        reply(apiKey, msgCode, null, data);
+        reply(apiKey, msgCode, null, data,null);
     }
 
     /**
@@ -313,7 +321,7 @@ public class ConnectorService extends Service
      * @param flag Boolean value.
      * @param dataBundle Data structure.
      */
-    private void reply(String apiKey, int msgCode, Boolean flag, Bundle dataBundle) {
+    private void reply(String apiKey, int msgCode, Boolean flag, Bundle dataBundle, Messenger replyTo) {
         Message reply = Message.obtain();
         // set message code
         reply.what = msgCode;
@@ -323,8 +331,12 @@ public class ConnectorService extends Service
         reply.setData(dataBundle);
 
         try {
+            Log.d(TAG, "Trying to send protocol registered to:" + apiKey);
             // send message
-            mConnectedClients.get(apiKey).send(reply);
+            if(replyTo==null)
+                mConnectedClients.get(apiKey).send(reply);
+            else
+                replyTo.send(reply);
         } catch (Exception e) {
             // client is not connected anymore
             Log.d(TAG, "client is not connected anymore: " + apiKey);

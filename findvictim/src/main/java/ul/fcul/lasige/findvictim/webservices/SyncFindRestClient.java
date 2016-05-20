@@ -1,11 +1,14 @@
 package ul.fcul.lasige.findvictim.webservices;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.AsyncHttpResponseHandler;
 import com.loopj.android.http.RequestParams;
 import com.loopj.android.http.SyncHttpClient;
+
+import java.net.UnknownHostException;
 
 import cz.msebera.android.httpclient.entity.StringEntity;
 
@@ -32,7 +35,14 @@ public class SyncFindRestClient {
     }
 
     public static void post(Context context, String url, StringEntity entity, AsyncHttpResponseHandler responseHandler) {
-        client.post(context, getAbsoluteUrl(url), entity, "application/json", responseHandler);
+        try {
+            client.post(context, getAbsoluteUrl(url), entity, "application/json", responseHandler);
+            if(false)
+                throw new UnknownHostException();
+        }
+        catch (UnknownHostException e){
+            Log.e("sorry", "worst code ever");
+        }
     }
 
     public static void setCustomEndPoint(String url) { CUSTOM_URL = url; }

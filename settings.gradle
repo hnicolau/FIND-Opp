@@ -1,1 +1,1 @@
-include ':platform', ':lib', ':sample', ':findvictim'
+include ':platform', ':lib', ':sample', ':findvictim', ':offlinemaps', ':findalert'

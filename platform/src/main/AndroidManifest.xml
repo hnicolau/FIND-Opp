@@ -54,6 +54,11 @@
             android:name="ul.fcul.lasige.find.packetcomm.PacketSenderService"
             android:exported="false" >
         </service>
+        <service
+            android:name="ul.fcul.lasige.find.packetcomm.PacketDownloadService"
+            android:exported="false" >
+        </service>
+
 
         <!-- BROADCAST RECEIVERS -->
         <receiver

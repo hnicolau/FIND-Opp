@@ -2,22 +2,33 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="ul.fcul.lasige.findvictim">
 
-    <uses-sdk android:minSdkVersion="8"/>
+    <uses-sdk android:minSdkVersion="8" />
 
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Google Cloud Messaging (GCM) Permissions -->
     <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
-    <permission android:name="ul.fcul.lasige.findvictim.permission.C2D_MESSAGE" android:protectionLevel="signature" />
-    <uses-permission android:name="ul.fcul.lasige.findvictim.permission.C2D_MESSAGE" />
-    <!-- End GCM Permissions -->
 
+    <permission
+        android:name="ul.fcul.lasige.findvictim.permission.C2D_MESSAGE"
+        android:protectionLevel="signature" />
+
+    <uses-permission android:name="ul.fcul.lasige.findvictim.permission.C2D_MESSAGE" />
+
+    <android:uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <android:uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <android:uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <!-- End GCM Permissions -->
     <application
-        android:name="ul.fcul.lasige.findvictim.app.VictimApp"
+        android:name=".app.VictimApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -25,10 +36,13 @@
         android:theme="@style/AppTheme">
 
         <!-- ACTIVITIES -->
-        <activity android:name="ul.fcul.lasige.findvictim.ui.MainActivity" android:label="@string/app_name"
+        <activity
+            android:name=".ui.MainActivity"
+            android:label="@string/app_name"
             android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
@@ -37,48 +51,32 @@
         <receiver
             android:name="com.google.android.gms.gcm.GcmReceiver"
             android:exported="true"
-            android:permission="com.google.android.c2dm.permission.SEND" >
+            android:permission="com.google.android.c2dm.permission.SEND">
             <intent-filter>
                 <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-                <action android:name="com.google.android.c2dm.intent.REGISTRATION" /> <!-- for pre-4.4 KitKat devices -->
+                <action android:name="com.google.android.c2dm.intent.REGISTRATION" />
+                <!-- for pre-4.4 KitKat devices -->
                 <category android:name="com.example.gcm" />
             </intent-filter>
         </receiver>
-        <receiver android:name="ul.fcul.lasige.findvictim.gcm.GcmScheduler$GcmSchedulerReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_START" />
-                <action android:name="ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_STOP" />
-            </intent-filter>
-        </receiver>
+
 
         <!-- SERVICES -->
         <service
-            android:name="ul.fcul.lasige.findvictim.sensors.SensorsService"
-            android:exported="false" >
-        </service>
-        <!-- gcm listener service -->
-        <service
-            android:name="ul.fcul.lasige.findvictim.gcm.MyGcmListenerService"
-            android:exported="false" >
+            android:name=".sensors.SensorsService"
+            android:exported="false" />
+
+
+        <receiver
+            android:name="ul.fcul.lasige.find.lib.service.ApiKeyReceiver"
+            android:enabled="true"
+            android:exported="true">
             <intent-filter>
-                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <action android:name="ul.fcul.lasige.find.action.ISSUE_API_KEY" />
             </intent-filter>
-        </service>
-        <!-- gcm listener service for updating registration tokens -->
-        <service
-            android:name="ul.fcul.lasige.findvictim.gcm.MyInstanceIDListenerService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.android.gms.iid.InstanceID"/>
-            </intent-filter>
-        </service>
-        <!-- gcm listener service for receiving registration tokens -->
-        <service
-            android:name="ul.fcul.lasige.findvictim.gcm.RegistrationIntentService"
-            android:exported="false">
-        </service>
+        </receiver>
+
+
     </application>
 
 </manifest>

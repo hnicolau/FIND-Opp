@@ -5,6 +5,7 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Handler;
+import android.util.Log;
 
 import com.google.common.base.Objects;
 
@@ -19,6 +20,9 @@ import java.util.List;
  * @see ContentObserver
  */
 public class PacketObserver extends ContentObserver {
+    private static final String TAG = InternetObserver.class.getSimpleName();
+
+
     // context of client app
     private final Context mContext;
     // URI incoming packets
@@ -69,6 +73,7 @@ public class PacketObserver extends ContentObserver {
      * CONTENT OBSERVER CONTRACT
      */
 
+
     /**
      * Method is called when content (i.e. incoming packets table) in the FIND platform is changed.
      *
@@ -93,7 +98,7 @@ public class PacketObserver extends ContentObserver {
             // set timestamp to last packet received; Math.max is to guarantee we don't go back in time
             mTimeLastPacketReceived = Math.max(mTimeLastPacketReceived, packet.getTimeReceived());
             // notifies client app of new packet received
-            mCallback.onPacketReceived(packet);
+            mCallback.onPacketReceived(packet, mObservedUri);
         }
         // save last timestamp persistently
         TokenStore.saveLastPacketReceived(mContext, mTimeLastPacketReceived);
@@ -125,7 +130,8 @@ public class PacketObserver extends ContentObserver {
      * CALLBACK INTERFACE FOR FIND CLIENT
      */
     public static interface PacketCallback {
-        public void onPacketReceived(Packet packet);
+        //public void onPacketReceived(Packet packet);
+        public void onPacketReceived(Packet packet, Uri uri);
     }
 
     /*
@@ -143,7 +149,6 @@ public class PacketObserver extends ContentObserver {
      */
     public List<Packet> getPacketsSince(long timestamp) {
         final ArrayList<Packet> newPackets = new ArrayList<>();
-
         // call Platform.data.FindProvider
         final Cursor newPacketsCursor = mContext.getContentResolver().query(
                 mObservedUri,
@@ -155,7 +160,7 @@ public class PacketObserver extends ContentObserver {
         while (newPacketsCursor.moveToNext()) {
             newPackets.add(Packet.fromCursor(newPacketsCursor));
         }
-
+        newPacketsCursor.close();
         return newPackets;
     }
 

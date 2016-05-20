@@ -4,18 +4,20 @@ import android.app.IntentService;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
+import android.os.Bundle;
 import android.util.Log;
 
+import ul.fcul.lasige.find.lib.data.ProtocolDefinitionParser;
 import ul.fcul.lasige.find.lib.data.TokenStore;
 
 /**
  * Created by hugonicolau on 03/11/2015.
- *
+ * <p/>
  * This class is responsible for requesting and receiving client app tokens. Both request and receive
  * are achieved via Broadcast.
- *
  */
-public class ApiKeyReceiver extends BroadcastReceiver{
+public class ApiKeyReceiver extends BroadcastReceiver {
     private static final String TAG = ApiKeyReceiver.class.getSimpleName();
 
     // action used to request/receive app token
@@ -34,7 +36,7 @@ public class ApiKeyReceiver extends BroadcastReceiver{
      * @see IntentService
      */
     public static void requestApiKey(Context context) {
-        Log.d(TAG, "Going to broadcast ACTION_ISSUE_API_KEY");
+        Log.d(TAG, "Going to broadcast ACTION_ISSUE_API_KEY VICTIM");
         final Intent intent = new Intent(ACTION_ISSUE_API_KEY);
         intent.putExtra(EXTRA_APP_NAME, context.getPackageName());
         intent.setPackage(FindConnector.FIND_PACKAGE);
@@ -46,17 +48,21 @@ public class ApiKeyReceiver extends BroadcastReceiver{
      * defined in the manifest.
      *
      * @param context The context of the FIND client app.
-     * @param intent Intent sent from the FIND service.
+     * @param intent  Intent sent from the FIND service.
      */
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent != null && intent.getAction().equals(ACTION_ISSUE_API_KEY)) {
-            Log.d(TAG, "Received ACTION_ISSUE_API_KEY");
             // get token
             final String apiKey = intent.getStringExtra(EXTRA_API_KEY);
             if (apiKey != null) {
+                Log.d(TAG, "Received ACTION_ISSUE_API_KEY TOKEN");
+
                 // save token
                 TokenStore.saveApiKey(context, apiKey);
+                FindConnector.getInstance(context).setMessengerKey(apiKey);
+                FindConnector.getInstance(context).reregisterProtocol();
+
             }
         }
     }

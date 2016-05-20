@@ -3,6 +3,7 @@ package ul.fcul.lasige.find.service;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -320,7 +321,9 @@ public class SupervisorService extends Service {
         if (!isActivated()) {
             if (mPolicy.allows(Policy.Feature.BLUETOOTH)) {
                 Log.d(TAG, "Requesting bluetooth discoverable mode upon supervisor activation");
-                //TODO mNetManager.requestBluetoothDiscoverable();
+                //Enabling bluetooth
+                // TODO mNetManager.requestBluetoothDiscoverable();
+
             }
             scheduleStateTransition(SupervisorState.RUNNING);
         }

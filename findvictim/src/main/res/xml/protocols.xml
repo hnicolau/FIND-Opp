@@ -3,6 +3,14 @@
     <protocol>
         <name>ul.fcul.lasige.findvictim</name>
         <encrypted>false</encrypted>
+        <endpoint>http://accessible-serv.lasige.di.fc.ul.pt/~lost/LostMap/index.php/rest/victims</endpoint>
+        <authenticated>false</authenticated>
+        <defaultTTL>3600</defaultTTL>
+    </protocol>
+    <protocol>
+        <name>ul.fcul.lasige.downloading</name>
+        <encrypted>false</encrypted>
+        <download_endpoint>http://accessible-serv.lasige.di.fc.ul.pt/~lost/LostMap/index.php/rest/simulations/update</download_endpoint>
         <authenticated>false</authenticated>
         <defaultTTL>3600</defaultTTL>
     </protocol>

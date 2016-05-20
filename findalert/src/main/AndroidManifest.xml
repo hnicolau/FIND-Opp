@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.unzi.findalert">
+
+    <!-- Google Cloud Messaging (GCM) Permissions -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+
+    <permission
+        android:name="com.example.unzi.findalert.permission.C2D_MESSAGE"
+        android:protectionLevel="signature" />
+
+    <uses-permission android:name="com.example.unzi.findalert.permission.C2D_MESSAGE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true">
+        <activity
+            android:name=".ui.AlertActivity"
+            android:label="@string/title_activity_alert" />
+
+        <!-- RECEIVER -->
+        <receiver
+            android:name="com.google.android.gms.gcm.GcmReceiver"
+            android:exported="true"
+            android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <action android:name="com.google.android.c2dm.intent.REGISTRATION" />
+                <!-- for pre-4.4 KitKat devices -->
+                <category android:name="com.example.gcm" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".gcm.GcmScheduler$GcmSchedulerReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_START" />
+                <action android:name="ul.fcul.lasige.findvictim.action.ALARM_SCHEDULE_STOP" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".gcm.MyGcmListenerService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+            </intent-filter>
+        </service>
+        <!-- gcm listener service for updating registration tokens -->
+        <service
+            android:name=".gcm.MyInstanceIDListenerService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.android.gms.iid.InstanceID" />
+            </intent-filter>
+        </service>
+        <!-- gcm listener service for receiving registration tokens -->
+        <service
+            android:name=".gcm.RegistrationIntentService"
+            android:exported="false" />
+        <service
+            android:name=".webservice.WebLogging"
+            android:exported="false" />
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+        <!-- ACTIVITIES -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.NoActionBar">
+        </activity>
+
+    </application>
+
+</manifest>
